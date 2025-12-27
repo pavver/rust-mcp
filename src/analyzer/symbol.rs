@@ -1,3 +1,4 @@
+use crate::analyzer::protocol::SymbolPathSegment;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Component, Path, PathBuf};
@@ -17,6 +18,54 @@ pub struct SymbolIdentity {
     pub module_path: Vec<String>,
     pub item_name: String,
     pub kind: SymbolKind,
+}
+
+pub fn symbol_kind_from_lsp_kind(kind: u32, name_hint: Option<&str>) -> SymbolKind {
+    match kind {
+        6 => SymbolKind::Method,
+        11 => SymbolKind::Trait,
+        12 => SymbolKind::FreeFunction,
+        23 => SymbolKind::Impl,
+        _ => {
+            if let Some(name) = name_hint {
+                if name.trim_start().starts_with("impl ") {
+                    return SymbolKind::Impl;
+                }
+            }
+            SymbolKind::Unknown
+        }
+    }
+}
+
+pub fn identity_from_definition(
+    uri: &str,
+    symbol_path: &[SymbolPathSegment],
+) -> Option<SymbolIdentity> {
+    let item_segment = symbol_path.last()?;
+    let mut module_path = module_path_from_uri(uri);
+    let crate_name = crate_name_from_uri(uri).unwrap_or_else(|| "unknown".to_string());
+    let parent_hint = symbol_path
+        .iter()
+        .rev()
+        .nth(1)
+        .map(|segment| segment.name.as_str());
+    let kind = symbol_kind_from_lsp_kind(item_segment.kind, parent_hint);
+
+    if symbol_path.len() > 1 {
+        module_path.extend(
+            symbol_path
+                .iter()
+                .take(symbol_path.len() - 1)
+                .map(|segment| segment.name.clone()),
+        );
+    }
+
+    Some(SymbolIdentity {
+        crate_name,
+        module_path,
+        item_name: item_segment.name.clone(),
+        kind,
+    })
 }
 
 pub fn identities_from_workspace_symbols(response: &Value) -> Vec<SymbolIdentity> {
@@ -71,9 +120,7 @@ fn derive_paths(container_name: Option<&str>, location_uri: Option<&str>) -> (St
         .or_else(|| location_uri.and_then(crate_name_from_uri));
 
     if module_path.is_empty() {
-        module_path = location_uri
-            .map(module_path_from_uri)
-            .unwrap_or_default();
+        module_path = location_uri.map(module_path_from_uri).unwrap_or_default();
     }
 
     let crate_name = crate_name.unwrap_or_else(|| "unknown".to_string());
@@ -192,7 +239,10 @@ fn module_path_from_uri(uri: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{identities_from_workspace_symbols, symbol_information_to_identity, SymbolIdentity, SymbolKind};
+    use super::{
+        SymbolIdentity, SymbolKind, identities_from_workspace_symbols,
+        symbol_information_to_identity,
+    };
     use serde_json::json;
 
     #[test]
@@ -224,7 +274,10 @@ mod tests {
         let identity = symbol_information_to_identity(&symbol).unwrap();
 
         assert_eq!(identity.crate_name, "demo");
-        assert_eq!(identity.module_path, vec!["types".to_string(), "Item".to_string()]);
+        assert_eq!(
+            identity.module_path,
+            vec!["types".to_string(), "Item".to_string()]
+        );
         assert_eq!(identity.item_name, "handle");
         assert_eq!(identity.kind, SymbolKind::Method);
     }
@@ -241,7 +294,10 @@ mod tests {
         let identity = symbol_information_to_identity(&symbol).unwrap();
 
         assert_eq!(identity.crate_name, "demo");
-        assert_eq!(identity.module_path, vec!["types".to_string(), "Item".to_string()]);
+        assert_eq!(
+            identity.module_path,
+            vec!["types".to_string(), "Item".to_string()]
+        );
         assert_eq!(identity.item_name, "new");
         assert_eq!(identity.kind, SymbolKind::Impl);
     }
@@ -272,7 +328,10 @@ mod tests {
         } = identities[0].clone();
 
         assert_eq!(crate_name, "demo");
-        assert_eq!(module_path, vec!["tools".to_string(), "navigation".to_string()]);
+        assert_eq!(
+            module_path,
+            vec!["tools".to_string(), "navigation".to_string()]
+        );
         assert_eq!(item_name, "navigate");
         assert_eq!(kind, SymbolKind::FreeFunction);
     }
