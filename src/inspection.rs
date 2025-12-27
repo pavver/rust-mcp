@@ -152,6 +152,13 @@ impl InspectionView {
     pub fn curated() -> Vec<Self> {
         vec![
             InspectionView {
+                name: "def",
+                description: "Definition location and symbol identity",
+                requires_nightly: false,
+                emit: None,
+                unpretty: None,
+            },
+            InspectionView {
                 name: "llvm-ir",
                 description: "Lowered LLVM IR for a symbol",
                 requires_nightly: false,
