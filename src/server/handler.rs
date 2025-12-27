@@ -5,11 +5,21 @@ use rmcp::{
     model::{ErrorData as McpError, *},
     tool, tool_handler, tool_router,
 };
-use serde_json::Value;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use serde_json::{Value, json};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use tokio::{fs, sync::Mutex};
 
-use crate::analyzer::RustAnalyzerClient;
+use crate::analyzer::{
+    RustAnalyzerClient,
+    symbol::{SymbolIdentity, SymbolKind, identity_from_definition},
+};
+use crate::compiler::{
+    CompilerRunner, RunRequest, RunResult,
+    extract::{NormalizedSymbol, TargetedAssembly, extract_asm, extract_llvm_ir, extract_mir},
+};
 use crate::server::parameters::*;
 use crate::tools::{execute_tool, get_tools};
 
@@ -796,33 +806,24 @@ impl RustMcpServer {
             target,
         }): Parameters<InspectMirParams>,
     ) -> Result<CallToolResult, McpError> {
-        let args = serde_json::json!({
-            "file_path": file_path,
-            "line": line,
-            "character": character,
-            "symbol_name": symbol_name,
-            "opt_level": opt_level,
-            "target": target
-        });
+        let symbol = self
+            .resolve_normalized_symbol(&file_path, line, character, symbol_name, target.clone())
+            .await?;
 
-        let mut analyzer = self.analyzer.lock().await;
-        match execute_tool("inspect_mir", args, &mut analyzer).await {
-            Ok(result) => {
-                if let Some(content) = result.content.first() {
-                    if let Some(text) = content.get("text") {
-                        return Ok(CallToolResult::success(vec![Content::text(
-                            text.as_str().unwrap_or("No result"),
-                        )]));
-                    }
-                }
-                Ok(CallToolResult::success(vec![Content::text(
-                    "MIR inspection not implemented",
-                )]))
-            }
-            Err(e) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Error: {e}"
-            ))])),
-        }
+        let run_result = self
+            .run_compiler(opt_level, target.clone(), None, Some("mir"))
+            .await?;
+
+        let mir_outputs = vec![run_result.stdout];
+        let mir = extract_mir(&mir_outputs, &symbol).map_err(|e| {
+            mcp_error(
+                ErrorCode::RESOURCE_NOT_FOUND,
+                format!("Unable to locate MIR for symbol: {e}"),
+                None,
+            )
+        })?;
+
+        Ok(CallToolResult::success(vec![Content::text(mir)]))
     }
 
     #[tool(description = "Inspect LLVM IR for a symbol or position")]
@@ -837,33 +838,32 @@ impl RustMcpServer {
             target,
         }): Parameters<InspectLlvmIrParams>,
     ) -> Result<CallToolResult, McpError> {
-        let args = serde_json::json!({
-            "file_path": file_path,
-            "line": line,
-            "character": character,
-            "symbol_name": symbol_name,
-            "opt_level": opt_level,
-            "target": target
-        });
+        let symbol = self
+            .resolve_normalized_symbol(&file_path, line, character, symbol_name, target.clone())
+            .await?;
 
-        let mut analyzer = self.analyzer.lock().await;
-        match execute_tool("inspect_llvm_ir", args, &mut analyzer).await {
-            Ok(result) => {
-                if let Some(content) = result.content.first() {
-                    if let Some(text) = content.get("text") {
-                        return Ok(CallToolResult::success(vec![Content::text(
-                            text.as_str().unwrap_or("No result"),
-                        )]));
-                    }
-                }
-                Ok(CallToolResult::success(vec![Content::text(
-                    "LLVM IR inspection not implemented",
-                )]))
-            }
-            Err(e) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Error: {e}"
-            ))])),
+        let run_result = self
+            .run_compiler(opt_level, target.clone(), Some("llvm-ir"), None)
+            .await?;
+
+        let llvm_outputs = read_artifacts(&run_result.artifacts, &["ll"]).await?;
+        if llvm_outputs.is_empty() {
+            return Err(mcp_error(
+                ErrorCode::INTERNAL_ERROR,
+                "No LLVM IR artifacts were produced by the compiler",
+                None,
+            ));
         }
+
+        let llvm_ir = extract_llvm_ir(&llvm_outputs, &symbol).map_err(|e| {
+            mcp_error(
+                ErrorCode::RESOURCE_NOT_FOUND,
+                format!("Unable to locate LLVM IR for symbol: {e}"),
+                None,
+            )
+        })?;
+
+        Ok(CallToolResult::success(vec![Content::text(llvm_ir)]))
     }
 
     #[tool(description = "Inspect assembly for a symbol or position")]
@@ -878,34 +878,244 @@ impl RustMcpServer {
             target,
         }): Parameters<InspectAsmParams>,
     ) -> Result<CallToolResult, McpError> {
-        let args = serde_json::json!({
+        let mut symbol = self
+            .resolve_normalized_symbol(&file_path, line, character, symbol_name, target.clone())
+            .await?;
+
+        let run_result = self
+            .run_compiler(opt_level, target.clone(), Some("asm"), None)
+            .await?;
+
+        let assemblies = load_assembly_artifacts(&run_result.artifacts, target.as_ref()).await?;
+        if assemblies.is_empty() {
+            return Err(mcp_error(
+                ErrorCode::INTERNAL_ERROR,
+                "No assembly artifacts were produced by the compiler",
+                None,
+            ));
+        }
+
+        let target_triple = target
+            .clone()
+            .or_else(|| assemblies.first().map(|asm| asm.target.clone()))
+            .unwrap_or_else(|| "host".to_string());
+        symbol = symbol.with_target(target_triple.clone());
+
+        let asm = extract_asm(&assemblies, &symbol, &target_triple).map_err(|e| {
+            mcp_error(
+                ErrorCode::RESOURCE_NOT_FOUND,
+                format!("Unable to locate assembly for symbol: {e}"),
+                None,
+            )
+        })?;
+
+        Ok(CallToolResult::success(vec![Content::text(asm)]))
+    }
+
+    async fn resolve_normalized_symbol(
+        &self,
+        file_path: &str,
+        line: Option<u32>,
+        character: Option<u32>,
+        symbol_name: Option<String>,
+        target: Option<String>,
+    ) -> Result<NormalizedSymbol, McpError> {
+        let (line, character) = match (line, character) {
+            (Some(line), Some(character)) => (line, character),
+            _ => {
+                return Err(mcp_error(
+                    ErrorCode::INVALID_PARAMS,
+                    "Both line and character are required to resolve a symbol",
+                    None,
+                ));
+            }
+        };
+
+        let identity = {
+            let mut analyzer = self.analyzer.lock().await;
+            let details = analyzer
+                .definition_details(file_path, line, character)
+                .await
+                .map_err(|e| {
+                    mcp_error(
+                        ErrorCode::INTERNAL_ERROR,
+                        format!("Failed to resolve symbol: {e}"),
+                        None,
+                    )
+                })?
+                .ok_or_else(|| symbol_not_found_error(file_path, line, character))?;
+
+            identity_from_definition(&details.location.uri, &details.symbol_path)
+                .ok_or_else(|| symbol_not_found_error(file_path, line, character))?
+        };
+
+        if !matches!(identity.kind, SymbolKind::FreeFunction | SymbolKind::Method) {
+            return Err(non_function_error(&identity));
+        }
+
+        let mut identity = identity;
+        if let Some(name) = symbol_name {
+            identity.item_name = name;
+        }
+
+        let mut normalized = NormalizedSymbol::from_identity(&identity);
+        if let Some(target) = target {
+            normalized = normalized.with_target(target);
+        }
+
+        Ok(normalized)
+    }
+
+    async fn run_compiler(
+        &self,
+        opt_level: Option<String>,
+        target: Option<String>,
+        emit: Option<&str>,
+        unpretty: Option<&str>,
+    ) -> Result<RunResult, McpError> {
+        let runner = CompilerRunner::new();
+        let request = RunRequest {
+            manifest_path: None,
+            package: None,
+            target_triple: target,
+            opt_level,
+            emit: emit.map(|emit| emit.to_string()),
+            unpretty: unpretty.map(|unpretty| unpretty.to_string()),
+            additional_rustc_args: Vec::new(),
+        };
+
+        let result = runner
+            .run(request)
+            .await
+            .map_err(|e| mcp_error(ErrorCode::INTERNAL_ERROR, format!("{e:#}"), None))?;
+
+        if !result.status.success() {
+            return Err(compiler_failure_error(&result));
+        }
+
+        Ok(result)
+    }
+}
+
+fn mcp_error(code: ErrorCode, message: impl Into<String>, data: Option<Value>) -> McpError {
+    McpError::new(code, message.into(), data)
+}
+
+fn symbol_not_found_error(file_path: &str, line: u32, character: u32) -> McpError {
+    mcp_error(
+        ErrorCode::RESOURCE_NOT_FOUND,
+        format!("No symbol found at {}:{}:{}", file_path, line, character),
+        Some(json!({
             "file_path": file_path,
             "line": line,
-            "character": character,
-            "symbol_name": symbol_name,
-            "opt_level": opt_level,
-            "target": target
-        });
+            "character": character
+        })),
+    )
+}
 
-        let mut analyzer = self.analyzer.lock().await;
-        match execute_tool("inspect_asm", args, &mut analyzer).await {
-            Ok(result) => {
-                if let Some(content) = result.content.first() {
-                    if let Some(text) = content.get("text") {
-                        return Ok(CallToolResult::success(vec![Content::text(
-                            text.as_str().unwrap_or("No result"),
-                        )]));
-                    }
-                }
-                Ok(CallToolResult::success(vec![Content::text(
-                    "Assembly inspection not implemented",
-                )]))
-            }
-            Err(e) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "Error: {e}"
-            ))])),
+fn non_function_error(identity: &SymbolIdentity) -> McpError {
+    mcp_error(
+        ErrorCode::INVALID_PARAMS,
+        format!(
+            "Item at position is not a function (found {:?})",
+            identity.kind
+        ),
+        Some(json!({
+            "kind": format!("{:?}", identity.kind)
+        })),
+    )
+}
+
+fn compiler_failure_error(result: &RunResult) -> McpError {
+    mcp_error(
+        ErrorCode::INTERNAL_ERROR,
+        "Compiler run failed",
+        Some(json!({
+            "status": result.status.code(),
+            "stdout": result.stdout,
+            "stderr": result.stderr
+        })),
+    )
+}
+
+async fn read_artifacts(paths: &[PathBuf], extensions: &[&str]) -> Result<Vec<String>, McpError> {
+    let mut outputs = Vec::new();
+
+    for path in paths {
+        let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+            continue;
+        };
+
+        if extensions
+            .iter()
+            .any(|wanted| ext.eq_ignore_ascii_case(wanted))
+        {
+            let content = fs::read_to_string(path).await.map_err(|e| {
+                mcp_error(
+                    ErrorCode::INTERNAL_ERROR,
+                    format!("Failed to read artifact {}: {e}", path.display()),
+                    Some(json!({
+                        "artifact": path
+                    })),
+                )
+            })?;
+
+            outputs.push(content);
         }
     }
+
+    Ok(outputs)
+}
+
+async fn load_assembly_artifacts(
+    paths: &[PathBuf],
+    target_hint: Option<&String>,
+) -> Result<Vec<TargetedAssembly>, McpError> {
+    let mut assemblies = Vec::new();
+
+    for path in paths {
+        let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+            continue;
+        };
+
+        if !(ext.eq_ignore_ascii_case("s") || ext.eq_ignore_ascii_case("asm")) {
+            continue;
+        }
+
+        let content = fs::read_to_string(path).await.map_err(|e| {
+            mcp_error(
+                ErrorCode::INTERNAL_ERROR,
+                format!("Failed to read assembly artifact {}: {e}", path.display()),
+                Some(json!({
+                    "artifact": path
+                })),
+            )
+        })?;
+
+        let target = infer_target_from_path(path)
+            .or_else(|| target_hint.cloned())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        assemblies.push(TargetedAssembly { target, content });
+    }
+
+    Ok(assemblies)
+}
+
+fn infer_target_from_path(path: &Path) -> Option<String> {
+    let mut components = path.components().peekable();
+    while let Some(component) = components.next() {
+        if component.as_os_str() == "mcp-inspections" {
+            if let Some(next) = components.next() {
+                let comp = next.as_os_str().to_string_lossy().into_owned();
+                if comp == "debug" || comp == "release" {
+                    return None;
+                }
+                return Some(comp);
+            }
+        }
+    }
+    None
 }
 
 #[tool_handler]
