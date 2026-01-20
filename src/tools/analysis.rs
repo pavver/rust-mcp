@@ -131,3 +131,43 @@ pub async fn get_hover_impl(
         ],
     })
 }
+
+pub async fn get_symbol_source_impl(
+    args: Value,
+    analyzer: &mut RustAnalyzerClient,
+) -> Result<ToolResult> {
+    let file_path = args
+        .get("file_path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
+    let line = args
+        .get("line")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("Missing line parameter"))?;
+    let character = args
+        .get("character")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("Missing character parameter"))?;
+
+    let (source, range, actual_path) = analyzer
+        .get_symbol_source(file_path, line as u32, character as u32)
+        .await?;
+
+    let result = json!({
+        "file_path": actual_path,
+        "range": range,
+        "source": source
+    });
+
+    Ok(ToolResult {
+        content: vec![
+            json!({
+                "type": "text",
+                "text": serde_json::to_string_pretty(&result)?
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        ],
+    })
+}

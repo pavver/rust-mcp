@@ -19,6 +19,11 @@ Use these tools to understand the codebase structure and symbol meanings.
     *   **Purpose:** Retrieves the signature, types, and documentation (doc comments) for a symbol at a specific position.
     *   **Parameters:** `file_path`, `line`, `character`.
     *   **Use Case:** When you need to know how to call a function or what a struct looks like. Returns formatted Markdown.
+*   **`get_symbol_source`** (PREFERRED for Implementation)
+    *   **Purpose:** Retrieves the exact source code implementation of a specific symbol (function, struct, etc.).
+    *   **Parameters:** `file_path`, `line`, `character`.
+    *   **Behavior:** Automatically performs "Go to Definition" from the provided position. If you point to a usage of a function, it returns the code of that function's definition (even in another file or library).
+    *   **Use Case:** Use this to read the code of a specific function or struct without reading the entire file. Works for both local code and external libraries. Returns JSON with `source`, `range` (in the definition file), and `file_path` (absolute path to the definition file).
 *   **`document_symbols`** (PREFERRED for File Structure)
     *   **Purpose:** Retrieves the structure of a file (functions, structs, impls) in a hierarchical JSON format.
     *   **Parameters:** `file_path`.

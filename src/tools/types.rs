@@ -60,6 +60,9 @@ pub async fn execute_tool(
             crate::tools::navigation::document_symbols_impl(args, analyzer).await
         }
         "get_hover" => crate::tools::analysis::get_hover_impl(args, analyzer).await,
+        "get_symbol_source" => {
+            crate::tools::analysis::get_symbol_source_impl(args, analyzer).await
+        }
         "rename_symbol" => crate::tools::refactoring::rename_symbol_impl(args, analyzer).await,
         "extract_function" => {
             crate::tools::refactoring::extract_function_impl(args, analyzer).await

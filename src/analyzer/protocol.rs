@@ -106,7 +106,87 @@ pub struct Hover {
     pub range: Option<Range>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextEdit {
+    pub range: Range,
+    #[serde(rename = "newText")]
+    pub new_text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceEdit {
+    pub changes: Option<std::collections::HashMap<String, Vec<TextEdit>>>,
+    // documentChanges is more complex, skipping for MVP unless needed
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Command {
+    pub title: String,
+    pub command: String,
+    #[serde(default)]
+    pub arguments: Option<Vec<Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeAction {
+    pub title: String,
+    pub kind: Option<String>,
+    pub diagnostics: Option<Vec<Diagnostic>>,
+    pub edit: Option<WorkspaceEdit>,
+    pub command: Option<Command>,
+    #[serde(rename = "isPreferred")]
+    pub is_preferred: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub severity: Option<u32>,
+    pub code: Option<Value>, // Can be number or string
+    pub source: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeActionContext {
+    pub diagnostics: Vec<Diagnostic>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub only: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeActionParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+    pub range: Range,
+    pub context: CodeActionContext,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CodeActionOrCommand {
+    Command(Command),
+    CodeAction(CodeAction),
+}
+
+pub type CodeActionResponse = Vec<CodeActionOrCommand>;
+
 pub type SymbolPath = Vec<SymbolPathSegment>;
+
+pub fn create_code_action_params(file_path: &str, start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Value {
+    json!({
+        "textDocument": {
+            "uri": format!("file://{}", file_path)
+        },
+        "range": {
+            "start": { "line": start_line, "character": start_char },
+            "end": { "line": end_line, "character": end_char }
+        },
+        "context": {
+            "diagnostics": []
+        }
+    })
+}
 
 pub fn create_text_document_position_params(file_path: &str, line: u32, character: u32) -> Value {
     json!({

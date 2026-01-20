@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Child;
+use tokio::fs;
 
 use crate::analyzer::protocol::*;
 
@@ -59,6 +60,31 @@ impl RustAnalyzerClient {
         let current_dir = std::env::current_dir()?;
         let root_uri = format!("file://{}", current_dir.display());
 
+        let full_analysis = std::env::var("RUST_MCP_FULL_ANALYSIS")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true);
+
+        let initialization_options = if full_analysis {
+            json!({
+                "cargo": {
+                    "loadOutDirsFromCheck": true
+                },
+                "procMacro": {
+                    "enable": true
+                }
+            })
+        } else {
+            json!({
+                "cargo": {
+                    "loadOutDirsFromCheck": false
+                },
+                "procMacro": {
+                    "enable": false
+                }
+            })
+        };
+
         // Send initialize request
         let init_params = json!({
             "processId": null,
@@ -67,6 +93,7 @@ impl RustAnalyzerClient {
                 "version": "0.1.0"
             },
             "rootUri": root_uri,
+            "initializationOptions": initialization_options,
             "capabilities": {
                 "textDocument": {
                     "definition": {
@@ -77,6 +104,9 @@ impl RustAnalyzerClient {
                     },
                     "publishDiagnostics": {
                         "relatedInformation": true
+                    },
+                    "documentSymbol": {
+                        "hierarchicalDocumentSymbolSupport": true
                     }
                 },
                 "workspace": {
@@ -427,6 +457,109 @@ impl RustAnalyzerClient {
         let symbols = self.request_document_symbols(&uri).await?;
         
         Ok(serde_json::to_string_pretty(&symbols)?)
+    }
+
+    fn find_symbol_range_recursive(symbols: &[DocumentSymbol], position: &Position) -> Option<Range> {
+        for symbol in symbols {
+            if Self::position_in_range(&symbol.range, position) {
+                 if let Some(children) = &symbol.children {
+                    if let Some(child_range) = Self::find_symbol_range_recursive(children, position) {
+                        return Some(child_range);
+                    }
+                 }
+                 return Some(symbol.range.clone());
+            }
+        }
+        None
+    }
+
+    pub async fn get_symbol_source(
+        &mut self,
+        file_path: &str,
+        line: u32,
+        character: u32,
+    ) -> Result<(String, Range, String)> {
+        self.ensure_initialized()?;
+        
+        // 1. Try to find definition first to handle references correctly
+        let def_params = TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: format!("file://{}", file_path),
+            },
+            position: Position { line, character },
+        };
+
+        // We catch errors here because if definition fails, we might want to fallback to current position
+        // assuming the user pointed directly at a definition.
+        let (target_uri, target_point) = match self.send_request_internal("textDocument/definition", serde_json::to_value(def_params)?).await {
+            Ok(def_response) => {
+                let def_result = Self::extract_result(&def_response)?;
+                
+                if def_result.is_null() {
+                    // Fallback to current file if definition lookup fails.
+                    // This allows the tool to work for symbols defined at the cursor position
+                    // or when rust-analyzer fails to resolve the reference.
+                    (format!("file://{}", file_path), Position { line, character })
+                } else {
+                    let def_parsed: DefinitionResponse = serde_json::from_value(def_result)?;
+                    
+                    if let Some(loc) = Self::select_definition_location(def_parsed) {
+                        (loc.uri, loc.range.start)
+                    } else {
+                        // Fallback
+                        (format!("file://{}", file_path), Position { line, character })
+                    }
+                }
+            }
+            Err(_) => {
+                (format!("file://{}", file_path), Position { line, character })
+            },
+        };
+        
+        let target_path = if target_uri.starts_with("file://") {
+            target_uri.strip_prefix("file://").unwrap().to_string()
+        } else {
+            target_uri.clone()
+        };
+
+        // 2. Get document symbols for the target file
+        // This works for external files too if rust-analyzer indexed them
+        let sym_response = self.request_document_symbols(&target_uri).await?;
+        
+        // 3. Find range covering the target point
+        let range = match sym_response {
+            DocumentSymbolResponse::DocumentSymbols(symbols) => {
+                Self::find_symbol_range_recursive(&symbols, &target_point)
+                    .ok_or_else(|| anyhow::anyhow!("No symbol found covering definition at {}:{}:{}", target_path, target_point.line, target_point.character))?
+            },
+            DocumentSymbolResponse::SymbolInformation(symbols) => {
+                 symbols.iter()
+                    .find(|info| Self::position_in_range(&info.location.range, &target_point))
+                    .map(|info| info.location.range.clone())
+                    .ok_or_else(|| anyhow::anyhow!("No symbol found covering definition (flat view)"))?
+            }
+        };
+
+        // 4. Read file content
+        let content = fs::read_to_string(&target_path).await
+            .map_err(|e| anyhow::anyhow!("Failed to read file {}: {}", target_path, e))?;
+            
+        let lines: Vec<&str> = content.lines().collect();
+        let start_line = range.start.line as usize;
+        let end_line = range.end.line as usize;
+        
+        if start_line >= lines.len() {
+             return Err(anyhow::anyhow!("Symbol range start line {} is out of bounds", start_line));
+        }
+        
+        let end_line_safe = std::cmp::min(end_line, lines.len().saturating_sub(1));
+        
+        if start_line > end_line_safe {
+            return Ok((String::new(), range, target_path));
+        }
+
+        let code_lines = &lines[start_line..=end_line_safe];
+        Ok((code_lines.join("\n"), range, target_path))
     }
 
     pub async fn rename_symbol(

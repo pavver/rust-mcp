@@ -10,10 +10,11 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 2. **Configure** your MCP client to use `target/release/rustmcp`
 3. **Use** through AI assistants with natural language prompts like "Generate a User struct with Debug and Clone derives"
 
-## Features - Complete Tool Suite (21 Tools)
+## Features - Complete Tool Suite (22 Tools)
 
-### Code Analysis (6 tools)
+### Code Analysis (7 tools)
 - `get_hover` - Get symbol signature and documentation
+- `get_symbol_source` - Get source code of specific symbol
 - `document_symbols` - Get file structure (outline)
 - `find_definition` - Navigate to symbol definitions
 - `find_references` - Find all symbol uses  
@@ -78,10 +79,11 @@ cargo build --release
 The server supports the following environment variables:
 
 - `RUST_ANALYZER_PATH` - Path to rust-analyzer binary (default: `~/.cargo/bin/rust-analyzer`)
+- `RUST_MCP_FULL_ANALYSIS` - Control analysis depth (default: `true`). Set to `false` to disable proc-macro expansion for faster startup on large projects (may reduce accuracy for macros).
 
 You can set this when running the server:
 ```bash
-RUST_ANALYZER_PATH=/usr/local/bin/rust-analyzer ./target/release/rustmcp
+RUST_ANALYZER_PATH=/usr/local/bin/rust-analyzer RUST_MCP_FULL_ANALYSIS=false ./target/release/rustmcp
 ```
 
 Or set it in your MCP client configuration (see examples below).

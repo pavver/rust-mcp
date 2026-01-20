@@ -342,6 +342,41 @@ impl RustMcpServer {
         }
     }
 
+    #[tool(description = "Get the source code of a specific symbol (function, struct, etc.)")]
+    async fn get_symbol_source(
+        &self,
+        Parameters(GetSymbolSourceParams {
+            file_path,
+            line,
+            character,
+        }): Parameters<GetSymbolSourceParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = serde_json::json!({
+            "file_path": file_path,
+            "line": line,
+            "character": character
+        });
+
+        let mut analyzer = self.analyzer.lock().await;
+        match execute_tool("get_symbol_source", args, &mut analyzer).await {
+            Ok(result) => {
+                if let Some(content) = result.content.first() {
+                    if let Some(text) = content.get("text") {
+                        return Ok(CallToolResult::success(vec![Content::text(
+                            text.as_str().unwrap_or("No result"),
+                        )]));
+                    }
+                }
+                Ok(CallToolResult::success(vec![Content::text(
+                    "No source found",
+                )]))
+            }
+            Err(e) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Error: {e}"
+            ))])),
+        }
+    }
+
     #[tool(description = "Rename a symbol with scope awareness")]
     async fn rename_symbol(
         &self,
