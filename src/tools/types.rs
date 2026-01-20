@@ -56,6 +56,7 @@ pub async fn execute_tool(
         "workspace_symbols" => {
             crate::tools::navigation::workspace_symbols_impl(args, analyzer).await
         }
+        "get_hover" => crate::tools::analysis::get_hover_impl(args, analyzer).await,
         "rename_symbol" => crate::tools::refactoring::rename_symbol_impl(args, analyzer).await,
         "extract_function" => {
             crate::tools::refactoring::extract_function_impl(args, analyzer).await
@@ -148,6 +149,19 @@ pub fn get_tools() -> Vec<ToolDefinition> {
                     "query": {"type": "string"}
                 },
                 "required": ["query"]
+            }),
+        ),
+        ToolDefinition::new(
+            "get_hover",
+            "Get hover information (signature and documentation) for a symbol at a given position",
+            json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string"},
+                    "line": {"type": "number"},
+                    "character": {"type": "number"}
+                },
+                "required": ["file_path", "line", "character"]
             }),
         ),
         ToolDefinition::new(

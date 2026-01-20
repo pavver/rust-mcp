@@ -94,6 +94,18 @@ pub struct SymbolPathSegment {
     pub kind: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarkupContent {
+    pub kind: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Hover {
+    pub contents: MarkupContent,
+    pub range: Option<Range>,
+}
+
 pub type SymbolPath = Vec<SymbolPathSegment>;
 
 pub fn create_text_document_position_params(file_path: &str, line: u32, character: u32) -> Value {

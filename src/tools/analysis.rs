@@ -83,13 +83,47 @@ pub async fn get_diagnostics_impl(
         .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
 
     // Implementation will use rust-analyzer LSP to get diagnostics
-    let result = analyzer.get_diagnostics(file_path).await?;
+    let diagnostics_result = analyzer.get_diagnostics(file_path).await?;
 
     Ok(ToolResult {
         content: vec![
             json!({
                 "type": "text",
-                "text": result
+                "text": diagnostics_result
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        ],
+    })
+}
+
+pub async fn get_hover_impl(
+    args: Value,
+    analyzer: &mut RustAnalyzerClient,
+) -> Result<ToolResult> {
+    let file_path = args
+        .get("file_path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
+    let line = args
+        .get("line")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("Missing line parameter"))?;
+    let character = args
+        .get("character")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("Missing character parameter"))?;
+
+    let hover_result = analyzer
+        .get_hover(file_path, line as u32, character as u32)
+        .await?;
+
+    Ok(ToolResult {
+        content: vec![
+            json!({
+                "type": "text",
+                "text": hover_result
             })
             .as_object()
             .unwrap()

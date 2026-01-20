@@ -278,6 +278,41 @@ impl RustMcpServer {
         }
     }
 
+    #[tool(description = "Get hover information (signature and documentation) for a symbol at a given position")]
+    async fn get_hover(
+        &self,
+        Parameters(GetHoverParams {
+            file_path,
+            line,
+            character,
+        }): Parameters<GetHoverParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let args = serde_json::json!({
+            "file_path": file_path,
+            "line": line,
+            "character": character
+        });
+
+        let mut analyzer = self.analyzer.lock().await;
+        match execute_tool("get_hover", args, &mut analyzer).await {
+            Ok(result) => {
+                if let Some(content) = result.content.first() {
+                    if let Some(text) = content.get("text") {
+                        return Ok(CallToolResult::success(vec![Content::text(
+                            text.as_str().unwrap_or("No hover information found"),
+                        )]));
+                    }
+                }
+                Ok(CallToolResult::success(vec![Content::text(
+                    "No hover information found",
+                )]))
+            }
+            Err(e) => Ok(CallToolResult::success(vec![Content::text(format!(
+                "Error: {e}"
+            ))])),
+        }
+    }
+
     #[tool(description = "Rename a symbol with scope awareness")]
     async fn rename_symbol(
         &self,

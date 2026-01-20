@@ -398,6 +398,28 @@ impl RustAnalyzerClient {
         Ok(format!("Workspace symbols response: {response}"))
     }
 
+    pub async fn get_hover(
+        &mut self,
+        file_path: &str,
+        line: u32,
+        character: u32,
+    ) -> Result<String> {
+        self.ensure_initialized()?;
+
+        let params = create_text_document_position_params(file_path, line, character);
+        let response = self
+            .send_request_internal("textDocument/hover", params)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        if result_value.is_null() {
+            return Ok("No hover information found".to_string());
+        }
+
+        let hover: Hover = serde_json::from_value(result_value)?;
+        Ok(hover.contents.value)
+    }
+
     pub async fn rename_symbol(
         &mut self,
         file_path: &str,

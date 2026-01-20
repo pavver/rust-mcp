@@ -16,6 +16,13 @@ pub struct FindReferencesParams {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct GetHoverParams {
+    pub file_path: String,
+    pub line: u32,
+    pub character: u32,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct GetDiagnosticsParams {
     pub file_path: String,
 }
