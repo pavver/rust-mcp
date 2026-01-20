@@ -141,6 +141,14 @@ pub fn create_workspace_symbol_params(query: &str) -> Value {
     })
 }
 
+pub fn create_document_symbol_params(file_path: &str) -> Value {
+    json!({
+        "textDocument": {
+            "uri": format!("file://{}", file_path)
+        }
+    })
+}
+
 pub fn create_rename_params(file_path: &str, line: u32, character: u32, new_name: &str) -> Value {
     json!({
         "textDocument": {

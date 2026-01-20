@@ -28,6 +28,11 @@ pub struct GetDiagnosticsParams {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct GetDocumentSymbolsParams {
+    pub file_path: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct WorkspaceSymbolsParams {
     pub query: String,
 }

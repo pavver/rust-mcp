@@ -10,10 +10,11 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 2. **Configure** your MCP client to use `target/release/rustmcp`
 3. **Use** through AI assistants with natural language prompts like "Generate a User struct with Debug and Clone derives"
 
-## Features - Complete Tool Suite (20 Tools)
+## Features - Complete Tool Suite (21 Tools)
 
-### Code Analysis (5 tools)
+### Code Analysis (6 tools)
 - `get_hover` - Get symbol signature and documentation
+- `document_symbols` - Get file structure (outline)
 - `find_definition` - Navigate to symbol definitions
 - `find_references` - Find all symbol uses  
 - `get_diagnostics` - Get compiler errors/warnings with fixes

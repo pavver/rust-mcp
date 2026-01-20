@@ -56,6 +56,9 @@ pub async fn execute_tool(
         "workspace_symbols" => {
             crate::tools::navigation::workspace_symbols_impl(args, analyzer).await
         }
+        "document_symbols" => {
+            crate::tools::navigation::document_symbols_impl(args, analyzer).await
+        }
         "get_hover" => crate::tools::analysis::get_hover_impl(args, analyzer).await,
         "rename_symbol" => crate::tools::refactoring::rename_symbol_impl(args, analyzer).await,
         "extract_function" => {
@@ -149,6 +152,17 @@ pub fn get_tools() -> Vec<ToolDefinition> {
                     "query": {"type": "string"}
                 },
                 "required": ["query"]
+            }),
+        ),
+        ToolDefinition::new(
+            "document_symbols",
+            "Get the structure (symbols) of a file (outline)",
+            json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string"}
+                },
+                "required": ["file_path"]
             }),
         ),
         ToolDefinition::new(

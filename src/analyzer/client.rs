@@ -420,6 +420,15 @@ impl RustAnalyzerClient {
         Ok(hover.contents.value)
     }
 
+    pub async fn get_document_symbols(&mut self, file_path: &str) -> Result<String> {
+        self.ensure_initialized()?;
+
+        let uri = format!("file://{}", file_path);
+        let symbols = self.request_document_symbols(&uri).await?;
+        
+        Ok(serde_json::to_string_pretty(&symbols)?)
+    }
+
     pub async fn rename_symbol(
         &mut self,
         file_path: &str,
