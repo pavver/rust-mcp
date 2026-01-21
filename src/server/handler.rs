@@ -278,7 +278,9 @@ impl RustMcpServer {
         }
     }
 
-    #[tool(description = "Get hover information (signature and documentation) for a symbol at a given position")]
+    #[tool(
+        description = "Get hover information (signature and documentation) for a symbol at a given position"
+    )]
     async fn get_hover(
         &self,
         Parameters(GetHoverParams {

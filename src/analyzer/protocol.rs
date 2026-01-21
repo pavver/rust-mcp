@@ -173,7 +173,13 @@ pub type CodeActionResponse = Vec<CodeActionOrCommand>;
 
 pub type SymbolPath = Vec<SymbolPathSegment>;
 
-pub fn create_code_action_params(file_path: &str, start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Value {
+pub fn create_code_action_params(
+    file_path: &str,
+    start_line: u32,
+    start_char: u32,
+    end_line: u32,
+    end_char: u32,
+) -> Value {
     json!({
         "textDocument": {
             "uri": format!("file://{}", file_path)
