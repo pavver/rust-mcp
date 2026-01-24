@@ -28,7 +28,7 @@ Use these tools to understand the codebase structure and symbol meanings.
 *   **`document_symbols`** (PREFERRED for File Structure)
     *   **Purpose:** Retrieves the structure of a file (functions, structs, impls) in a hierarchical JSON format.
     *   **Parameters:** `file_path`.
-    *   **Use Case:** Use this instead of `read_file` to get a high-level overview of a large file (the "outline" or table of contents).
+    *   **Use Case:** **CRITICAL for Large Files:** ALWAYS use this *before* reading a large file. It returns a lightweight outline. Use the returned ranges to read *only* the specific code you need with `read_file` (using limits/offsets), saving massive amounts of context tokens.
 *   **`find_definition`**
     *   **Purpose:** Locates where a symbol is defined.
     *   **Parameters:** `file_path`, `line`, `character`.

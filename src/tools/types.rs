@@ -155,7 +155,7 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "document_symbols",
-            "Get the structure (symbols) of a file (outline)",
+            "Retrieves the hierarchical structure (symbols) of a file. PREFERRED over `read_file` for large files to understand code organization without consuming massive context tokens. Returns an outline of functions, structs, and impls.",
             json!({
                 "type": "object",
                 "properties": {
