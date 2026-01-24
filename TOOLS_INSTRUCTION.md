@@ -16,9 +16,10 @@ The server will return an error if a relative path is provided. Always resolve t
 Use these tools to understand the codebase structure and symbol meanings.
 
 *   **`get_hover`** (PREFERRED for Signatures)
-    *   **Purpose:** Retrieves the signature, types, and documentation (doc comments) for a symbol at a specific position.
-    *   **Parameters:** `file_path`, `line`, `character`.
-    *   **Use Case:** When you need to know how to call a function or what a struct looks like. Returns formatted Markdown.
+    *   **Purpose:** Retrieves the signature, types, and documentation (doc comments) for a symbol by locating it within a provided code block.
+    *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).
+    *   **Behavior:** Searches for `code_block` in the file and then finds the N-th `occurrence` of `symbol` within that block. This is much more reliable than using raw coordinates.
+    *   **Use Case:** When you need to know how to call a function or what a struct looks like. Providing 3-5 lines of context in `code_block` ensures precision. Returns formatted Markdown.
 *   **`get_symbol_source`** (PREFERRED for Implementation)
     *   **Purpose:** Retrieves the exact source code implementation of a specific symbol (function, struct, etc.).
     *   **Parameters:** `file_path`, `line`, `character`.

@@ -166,15 +166,16 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "get_hover",
-            "Get hover information (signature and documentation) for a symbol at a given position",
+            "Retrieves hover information (signature, documentation) for a specific symbol by locating it within a provided code block. This method is more robust than using line/character coordinates.",
             json!({
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string"},
-                    "line": {"type": "number"},
-                    "character": {"type": "number"}
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "symbol": {"type": "string", "description": "The exact symbol name to hover over"},
+                    "code_block": {"type": "string", "description": "A unique multi-line code snippet (3-5 lines) containing the target symbol to ensure correct context"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the symbol's occurrence within the provided code_block. Defaults to 1.", "default": 1}
                 },
-                "required": ["file_path", "line", "character"]
+                "required": ["file_path", "symbol", "code_block"]
             }),
         ),
         ToolDefinition::new(
