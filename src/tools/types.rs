@@ -179,6 +179,20 @@ pub fn get_tools() -> Vec<ToolDefinition> {
             }),
         ),
         ToolDefinition::new(
+            "get_symbol_source",
+            "Retrieves the source code of a symbol by locating it within a provided code block. Useful for reading implementations.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "symbol": {"type": "string", "description": "The exact symbol name"},
+                    "code_block": {"type": "string", "description": "A unique multi-line code snippet containing the symbol"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the symbol's occurrence within the code_block", "default": 1}
+                },
+                "required": ["file_path", "symbol", "code_block"]
+            }),
+        ),
+        ToolDefinition::new(
             "rename_symbol",
             "Rename a symbol with scope awareness",
             json!({

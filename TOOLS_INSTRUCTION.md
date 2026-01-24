@@ -21,10 +21,10 @@ Use these tools to understand the codebase structure and symbol meanings.
     *   **Behavior:** Searches for `code_block` in the file and then finds the N-th `occurrence` of `symbol` within that block. This is much more reliable than using raw coordinates.
     *   **Use Case:** When you need to know how to call a function or what a struct looks like. Providing 3-5 lines of context in `code_block` ensures precision. Returns formatted Markdown.
 *   **`get_symbol_source`** (PREFERRED for Implementation)
-    *   **Purpose:** Retrieves the exact source code implementation of a specific symbol (function, struct, etc.).
-    *   **Parameters:** `file_path`, `line`, `character`.
-    *   **Behavior:** Automatically performs "Go to Definition" from the provided position. If you point to a usage of a function, it returns the code of that function's definition (even in another file or library).
-    *   **Use Case:** Use this to read the code of a specific function or struct without reading the entire file. Works for both local code and external libraries. Returns JSON with `source`, `range` (in the definition file), and `file_path` (absolute path to the definition file).
+    *   **Purpose:** Retrieves the exact source code implementation of a specific symbol by locating it within a provided code block.
+    *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).
+    *   **Behavior:** Searches for `code_block` in the file and then finds the N-th `occurrence` of `symbol` within that block. This ensures precision even if line numbers change.
+    *   **Use Case:** Use this to read the code of a specific function or struct without reading the entire file. Works for both local code and external libraries. Returns JSON with `source`, `range` (in the definition file), and `file_path`.
 *   **`document_symbols`** (PREFERRED for File Structure)
     *   **Purpose:** Retrieves the structure of a file (functions, structs, impls) in a hierarchical JSON format.
     *   **Parameters:** `file_path`.

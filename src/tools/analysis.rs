@@ -121,6 +121,31 @@ pub async fn get_hover_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> R
         .await
         .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
 
+    let (line, character) = find_symbol_location(&file_content, symbol, code_block, occurrence)?;
+
+    let hover_result = analyzer
+        .get_hover(file_path, line, character)
+        .await?;
+
+    Ok(ToolResult {
+        content: vec![
+            json!({
+                "type": "text",
+                "text": hover_result
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        ],
+    })
+}
+
+fn find_symbol_location(
+    file_content: &str,
+    symbol: &str,
+    code_block: &str,
+    occurrence: usize,
+) -> Result<(u32, u32)> {
     // Find the code block
     // We assume the LLM copies the block accurately.
     let block_start_idx = file_content
@@ -153,7 +178,7 @@ pub async fn get_hover_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> R
         };
 
         let absolute_symbol_idx = block_start_idx + idx;
-        let is_code = is_valid_code_context(&file_content, absolute_symbol_idx);
+        let is_code = is_valid_code_context(file_content, absolute_symbol_idx);
 
         if valid_start && valid_end && is_code {
             current_occurrence += 1;
@@ -177,23 +202,7 @@ pub async fn get_hover_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> R
     let absolute_symbol_idx = block_start_idx + symbol_offset_in_block;
 
     // Convert index to line and character (LSP compatible)
-    let (line, character) = index_to_line_col(&file_content, absolute_symbol_idx);
-
-    let hover_result = analyzer
-        .get_hover(file_path, line, character)
-        .await?;
-
-    Ok(ToolResult {
-        content: vec![
-            json!({
-                "type": "text",
-                "text": hover_result
-            })
-            .as_object()
-            .unwrap()
-            .clone(),
-        ],
-    })
+    Ok(index_to_line_col(file_content, absolute_symbol_idx))
 }
 
 fn index_to_line_col(text: &str, index: usize) -> (u32, u32) {
@@ -392,24 +401,32 @@ pub async fn get_symbol_source_impl(
         .get("file_path")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
-    let line = args
-        .get("line")
+    let symbol = args
+        .get("symbol")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing symbol parameter"))?;
+    let code_block = args
+        .get("code_block")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing code_block parameter"))?;
+    let occurrence = args
+        .get("occurrence")
         .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing line parameter"))?;
-    let character = args
-        .get("character")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing character parameter"))?;
+        .unwrap_or(1) as usize;
 
+    let file_content = fs::read_to_string(file_path)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+
+    let (line, character) = find_symbol_location(&file_content, symbol, code_block, occurrence)?;
+    
     // Try to read the line content for context (even if get_symbol_source fails)
-    let context_line = match fs::read_to_string(file_path).await {
-        Ok(content) => content
-            .lines()
-            .nth(line as usize)
-            .unwrap_or("<line out of bounds>")
-            .to_string(),
-        Err(e) => format!("<failed to read file: {}>", e),
-    };
+    let context_line = file_content
+        .lines()
+        .nth(line as usize)
+        .unwrap_or("<line out of bounds>")
+        .to_string();
+
     let context_marker = create_position_marker(&context_line, character as u32);
 
     match analyzer
@@ -420,6 +437,8 @@ pub async fn get_symbol_source_impl(
             let result = json!({
                 "request": {
                     "file_path": file_path,
+                    "symbol": symbol,
+                    "occurrence": occurrence,
                     "line": line,
                     "character": character,
                     "context_line": context_line,
