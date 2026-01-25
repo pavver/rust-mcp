@@ -41,6 +41,7 @@ Use these tools to understand the codebase structure and symbol meanings.
     *   **Use Case:** You know the name (e.g., "RustMcpServer") but not the location.
 *   **`get_diagnostics`**
     *   **Purpose:** Retrieves compilation errors and warnings for a specific file.
+    *   **Parameters:** `file_path`.
 *   **`get_type_hierarchy`**
     *   **Purpose:** Retrieves the type hierarchy (supertypes and subtypes) for a symbol by searching within a provided code block.
     *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).

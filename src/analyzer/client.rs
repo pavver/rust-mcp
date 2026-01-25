@@ -1,6 +1,8 @@
 use anyhow::Result;
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Child;
@@ -25,6 +27,7 @@ pub struct RustAnalyzerClient {
     process: Option<Child>,
     request_id: u64,
     initialized: bool,
+    diagnostics: Arc<Mutex<HashMap<String, Vec<Diagnostic>>>>,
 }
 
 impl Default for RustAnalyzerClient {
@@ -39,6 +42,7 @@ impl RustAnalyzerClient {
             process: None,
             request_id: 0,
             initialized: false,
+            diagnostics: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -167,6 +171,8 @@ impl RustAnalyzerClient {
     }
 
     async fn read_response(&mut self, expected_id: u64) -> Result<Value> {
+        let diagnostics_store = self.diagnostics.clone();
+
         if let Some(child) = &mut self.process {
             if let Some(stdout) = child.stdout.as_mut() {
                 let mut reader = BufReader::new(stdout);
@@ -197,6 +203,19 @@ impl RustAnalyzerClient {
                         if let Some(id) = response.get("id") {
                             if id.as_u64() == Some(expected_id) {
                                 return Ok(response);
+                            }
+                        } else {
+                            // Notification - inline handling
+                            if let Some(method) = response.get("method").and_then(|m| m.as_str()) {
+                                if method == "textDocument/publishDiagnostics" {
+                                    if let Some(params) = response.get("params") {
+                                        if let Ok(diag_params) = serde_json::from_value::<PublishDiagnosticsParams>(params.clone()) {
+                                            if let Ok(mut store) = diagnostics_store.lock() {
+                                                store.insert(diag_params.uri, diag_params.diagnostics);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -406,13 +425,66 @@ impl RustAnalyzerClient {
     }
 
     pub async fn get_diagnostics(&mut self, file_path: &str) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
+        self.ensure_initialized()?;
+        
+        let uri = format!("file://{}", file_path);
+
+        // 1. Open the file to ensure analysis is fresh and we get diagnostics
+        match fs::read_to_string(file_path).await {
+            Ok(text) => {
+                 let did_open_params = json!({
+                    "textDocument": {
+                        "uri": uri,
+                        "languageId": "rust",
+                        "version": 1,
+                        "text": text
+                    }
+                });
+                self.send_notification("textDocument/didOpen", did_open_params).await?;
+            }
+            Err(e) => {
+                 return Err(anyhow::anyhow!("Failed to read file for diagnostics: {}", e));
+            }
         }
 
-        // For diagnostics, we typically receive them via notifications
-        // This is a simplified implementation
-        Ok(format!("Diagnostics for file: {file_path}"))
+        // 2. Send a dummy request to pump the event loop and receive diagnostics.
+        // We use request_document_symbols as it's a standard read-only request.
+        // We ignore the result, as we only care about the side effect of processing notifications
+        // inside read_response while waiting.
+        let _ = self.request_document_symbols(&uri).await;
+
+        // 3. Check if we have diagnostics in our store
+        let diagnostics_lock = self.diagnostics.lock().map_err(|e| anyhow::anyhow!("Failed to lock diagnostics: {}", e))?;
+        if let Some(diagnostics) = diagnostics_lock.get(&uri) {
+            if diagnostics.is_empty() {
+                 return Ok("No diagnostics found.".to_string());
+            }
+
+            let mut result = format!("Diagnostics for {}:\n\n", file_path);
+            for diag in diagnostics {
+                let severity = match diag.severity.unwrap_or(1) {
+                    1 => "ERROR",
+                    2 => "WARNING",
+                    3 => "INFO",
+                    4 => "HINT",
+                    _ => "UNKNOWN",
+                };
+                
+                let start = &diag.range.start;
+                let message = &diag.message;
+                
+                result.push_str(&format!(
+                    "[{}] {}:{}: {}\n", 
+                    severity, 
+                    start.line + 1, 
+                    start.character + 1, 
+                    message
+                ));
+            }
+            Ok(result)
+        } else {
+             Ok("No diagnostics found (yet).".to_string())
+        }
     }
 
     pub async fn workspace_symbols(&mut self, query: &str) -> Result<String> {

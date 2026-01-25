@@ -148,6 +148,12 @@ pub struct Diagnostic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublishDiagnosticsParams {
+    pub uri: String,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeActionContext {
     pub diagnostics: Vec<Diagnostic>,
     #[serde(skip_serializing_if = "Option::is_none")]
