@@ -26,27 +26,3 @@ pub async fn apply_clippy_suggestions_impl(
         ],
     })
 }
-
-pub async fn validate_lifetimes_impl(
-    args: Value,
-    analyzer: &mut RustAnalyzerClient,
-) -> Result<ToolResult> {
-    let file_path = args
-        .get("file_path")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
-
-    let result = analyzer.validate_lifetimes(file_path).await?;
-
-    Ok(ToolResult {
-        content: vec![
-            json!({
-                "type": "text",
-                "text": result
-            })
-            .as_object()
-            .unwrap()
-            .clone(),
-        ],
-    })
-}

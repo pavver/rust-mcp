@@ -63,27 +63,10 @@ pub async fn execute_tool(
         "extract_function" => {
             crate::tools::refactoring::extract_function_impl(args, analyzer).await
         }
-        "format_code" => crate::tools::formatting::format_code_impl(args, analyzer).await,
-        "analyze_manifest" => crate::tools::cargo::analyze_manifest_impl(args, analyzer).await,
         "run_cargo_check" => crate::tools::cargo::run_cargo_check_impl(args, analyzer).await,
-        "generate_struct" => crate::tools::generation::generate_struct_impl(args, analyzer).await,
-        "generate_enum" => crate::tools::generation::generate_enum_impl(args, analyzer).await,
-        "generate_trait_impl" => {
-            crate::tools::generation::generate_trait_impl_impl(args, analyzer).await
-        }
-        "generate_tests" => crate::tools::generation::generate_tests_impl(args, analyzer).await,
         "inline_function" => crate::tools::refactoring::inline_function_impl(args, analyzer).await,
-        "change_signature" => {
-            crate::tools::refactoring::change_signature_impl(args, analyzer).await
-        }
-        "organize_imports" => {
-            crate::tools::refactoring::organize_imports_impl(args, analyzer).await
-        }
         "apply_clippy_suggestions" => {
             crate::tools::quality::apply_clippy_suggestions_impl(args, analyzer).await
-        }
-        "validate_lifetimes" => {
-            crate::tools::quality::validate_lifetimes_impl(args, analyzer).await
         }
         "get_type_hierarchy" => {
             crate::tools::advanced::get_type_hierarchy_impl(args, analyzer).await
@@ -91,7 +74,6 @@ pub async fn execute_tool(
         "suggest_dependencies" => {
             crate::tools::advanced::suggest_dependencies_impl(args, analyzer).await
         }
-        "create_module" => crate::tools::advanced::create_module_impl(args, analyzer).await,
         "move_items" => crate::tools::advanced::move_items_impl(args, analyzer).await,
         "inspect_mir" => Ok(not_implemented_tool_result("inspect_mir")),
         "inspect_llvm_ir" => Ok(not_implemented_tool_result("inspect_llvm_ir")),
@@ -207,28 +189,6 @@ pub fn get_tools() -> Vec<ToolDefinition> {
             }),
         ),
         ToolDefinition::new(
-            "format_code",
-            "Apply rustfmt formatting to a file",
-            json!({
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"}
-                },
-                "required": ["file_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "analyze_manifest",
-            "Parse and analyze Cargo.toml file",
-            json!({
-                "type": "object",
-                "properties": {
-                    "manifest_path": {"type": "string"}
-                },
-                "required": ["manifest_path"]
-            }),
-        ),
-        ToolDefinition::new(
             "run_cargo_check",
             "Execute cargo check and parse errors",
             json!({
@@ -256,60 +216,6 @@ pub fn get_tools() -> Vec<ToolDefinition> {
             }),
         ),
         ToolDefinition::new(
-            "generate_struct",
-            "Generate a struct with specified fields and derives",
-            json!({
-                "type": "object",
-                "properties": {
-                    "struct_name": {"type": "string"},
-                    "fields": {"type": "array", "items": {"type": "object"}},
-                    "derives": {"type": "array", "items": {"type": "string"}},
-                    "file_path": {"type": "string"}
-                },
-                "required": ["struct_name", "fields", "file_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "generate_enum",
-            "Generate an enum with specified variants and derives",
-            json!({
-                "type": "object",
-                "properties": {
-                    "enum_name": {"type": "string"},
-                    "variants": {"type": "array", "items": {"type": "object"}},
-                    "derives": {"type": "array", "items": {"type": "string"}},
-                    "file_path": {"type": "string"}
-                },
-                "required": ["enum_name", "variants", "file_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "generate_trait_impl",
-            "Generate a trait implementation for a struct",
-            json!({
-                "type": "object",
-                "properties": {
-                    "trait_name": {"type": "string"},
-                    "struct_name": {"type": "string"},
-                    "file_path": {"type": "string"}
-                },
-                "required": ["trait_name", "struct_name", "file_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "generate_tests",
-            "Generate unit tests for a function",
-            json!({
-                "type": "object",
-                "properties": {
-                    "target_function": {"type": "string"},
-                    "file_path": {"type": "string"},
-                    "test_cases": {"type": "array", "items": {"type": "object"}}
-                },
-                "required": ["target_function", "file_path"]
-            }),
-        ),
-        ToolDefinition::new(
             "inline_function",
             "Inline a function call at specified position",
             json!({
@@ -320,31 +226,6 @@ pub fn get_tools() -> Vec<ToolDefinition> {
                     "character": {"type": "number"}
                 },
                 "required": ["file_path", "line", "character"]
-            }),
-        ),
-        ToolDefinition::new(
-            "change_signature",
-            "Change the signature of a function",
-            json!({
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "line": {"type": "number"},
-                    "character": {"type": "number"},
-                    "new_signature": {"type": "string"}
-                },
-                "required": ["file_path", "line", "character", "new_signature"]
-            }),
-        ),
-        ToolDefinition::new(
-            "organize_imports",
-            "Organize and sort import statements in a file",
-            json!({
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"}
-                },
-                "required": ["file_path"]
             }),
         ),
         ToolDefinition::new(
@@ -392,19 +273,6 @@ pub fn get_tools() -> Vec<ToolDefinition> {
                     "workspace_path": {"type": "string"}
                 },
                 "required": ["query", "workspace_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "create_module",
-            "Create a new Rust module with optional visibility",
-            json!({
-                "type": "object",
-                "properties": {
-                    "module_name": {"type": "string"},
-                    "module_path": {"type": "string"},
-                    "is_public": {"type": "boolean"}
-                },
-                "required": ["module_name", "module_path"]
             }),
         ),
         ToolDefinition::new(

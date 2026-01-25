@@ -10,46 +10,32 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 2. **Configure** your MCP client to use `target/release/rustmcp`
 3. **Use** through AI assistants with natural language prompts like "Generate a User struct with Debug and Clone derives"
 
-## Features - Complete Tool Suite (22 Tools)
+## Features - Core Tool Suite (13 Tools)
 
-### Code Analysis (7 tools)
-- `get_hover` - Get symbol signature and documentation
-- `get_symbol_source` - Get source code of specific symbol
-- `document_symbols` - Get file structure (outline)
+### Code Analysis & Navigation (7 tools)
+- `get_hover` - Get symbol signature and documentation (context-aware)
+- `get_symbol_source` - Get source code of specific symbol (context-aware)
+- `document_symbols` - Get file structure (outline) - **Recommended for large files**
 - `find_definition` - Navigate to symbol definitions
 - `find_references` - Find all symbol uses  
 - `get_diagnostics` - Get compiler errors/warnings with fixes
 - `workspace_symbols` - Search project symbols
 
-### Code Generation (4 tools)
-- `generate_struct` - Create structs with derives and constructors
-- `generate_enum` - Create enums with variants
-- `generate_trait_impl` - Generate trait implementations with stubs
-- `generate_tests` - Create unit or integration test templates
-
-### Refactoring (5 tools)
+### Refactoring (3 tools)
 - `rename_symbol` - Rename with scope awareness
 - `extract_function` - Extract code into functions
 - `inline_function` - Inline function calls
-- `organize_imports` - Sort and organize use statements
-- `format_code` - Apply rustfmt formatting
 
-### Quality Assurance (2 tools)
+### Quality Assurance (1 tool)
 - `apply_clippy_suggestions` - Apply clippy automatic fixes
-- `validate_lifetimes` - Check lifetime and borrow checker issues
 
-### Project Management (2 tools)
-- `analyze_manifest` - Parse and analyze Cargo.toml
+### Project Management (1 tool)
 - `run_cargo_check` - Execute cargo check with error parsing
 
-### Advanced Features (4 tools)
+### Advanced Features (1 tool)
 - `get_type_hierarchy` - Get type relationships for symbols
 - `suggest_dependencies` - Recommend crates based on code patterns
-- `create_module` - Create new Rust modules with visibility control
 - `move_items` - Move code items between files
-
-### Additional Advanced Tools
-- `change_signature` - Modify function signatures safely
 
 ## Prerequisites
 
@@ -177,32 +163,20 @@ Once configured, you can use the tools through your AI assistant. Here are some 
 "Search for all symbols matching 'user' in the workspace"
 ```
 
-### Code Generation
-```
-"Generate a struct called `User` with fields: name (String), age (u32), email (String), with Debug and Clone derives"
-"Create an enum called `HttpStatus` with variants: Ok, NotFound, ServerError"
-"Generate unit tests for the `calculate_total` function"
-"Generate a Display trait implementation for the User struct"
-```
-
 ### Refactoring
 ```
 "Rename the variable `data` to `user_input` throughout the codebase"
 "Extract this code block into a separate function called `validate_input`"
 "Inline the `helper_function` call on line 42"
-"Organize all import statements in src/lib.rs"
-"Format all the code in src/lib.rs"
 ```
 
 ### Quality Assurance
 ```
 "Run clippy and apply all automatic fixes to improve code quality"
-"Check for any lifetime or borrow checker issues in src/auth.rs"
 ```
 
 ### Project Management
 ```
-"Analyze the Cargo.toml file and show dependency information"
 "Run cargo check and report any compilation errors"
 ```
 
@@ -210,9 +184,7 @@ Once configured, you can use the tools through your AI assistant. Here are some 
 ```
 "Show me the type hierarchy for the symbol at line 15, character 8 in src/main.rs"
 "Suggest crate dependencies for HTTP client functionality in this workspace"
-"Create a new public module called 'auth' in src/auth.rs"
 "Move the User struct and validate_user function from src/main.rs to src/user.rs"
-"Change the signature of the process_data function to accept a reference instead of ownership"
 ```
 
 ## Architecture

@@ -65,40 +65,6 @@ pub async fn suggest_dependencies_impl(
     })
 }
 
-pub async fn create_module_impl(
-    args: Value,
-    analyzer: &mut RustAnalyzerClient,
-) -> Result<ToolResult> {
-    let module_name = args
-        .get("module_name")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing module_name parameter"))?;
-    let module_path = args
-        .get("module_path")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing module_path parameter"))?;
-    let is_public = args
-        .get("is_public")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    let result = analyzer
-        .create_module(module_name, module_path, is_public)
-        .await?;
-
-    Ok(ToolResult {
-        content: vec![
-            json!({
-                "type": "text",
-                "text": result
-            })
-            .as_object()
-            .unwrap()
-            .clone(),
-        ],
-    })
-}
-
 pub async fn move_items_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> Result<ToolResult> {
     let source_file = args
         .get("source_file")

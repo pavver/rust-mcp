@@ -41,29 +41,17 @@ Use these tools to understand the codebase structure and symbol meanings.
 *   **`get_diagnostics`**
     *   **Purpose:** Retrieves compilation errors and warnings for a specific file.
 
-### 🛠 Code Generation
-Helpers for scaffolding boilerplate code.
-
-*   **`generate_struct`**: Creates structs with fields and derives.
-*   **`generate_enum`**: Creates enums with variants.
-*   **`generate_trait_impl`**: Generates trait implementation stubs.
-*   **`generate_tests`**: Scaffolds unit tests for a specific function.
-
-### ♻️ Refactoring
+### 🛠 Refactoring
 Tools to modify code structure safely.
 
 *   **`rename_symbol`**: Renames symbols with scope awareness (safe refactoring).
 *   **`extract_function`**: Moves selected code into a new function.
 *   **`inline_function`**: Replaces a function call with its body.
-*   **`organize_imports`**: Sorts and deduplicates `use` statements.
-*   **`format_code`**: Applies `cargo fmt` style.
 
 ### ✅ Quality Assurance
 *   **`apply_clippy_suggestions`**: Automatically fixes common linting errors.
-*   **`validate_lifetimes`**: Checks for borrow checker issues.
 
 ### 📦 Project Management
-*   **`analyze_manifest`**: Parses `Cargo.toml`.
 *   **`run_cargo_check`**: Runs compilation check. useful to verify code state if analysis seems broken.
 
 ## 2. Best Practices & Workflows
