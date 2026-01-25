@@ -65,10 +65,8 @@ pub struct RunCargoCheckParams {
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ExtractFunctionParams {
     pub file_path: String,
-    pub start_line: u32,
-    pub start_character: u32,
-    pub end_line: u32,
-    pub end_character: u32,
+    pub code_block: String,
+    pub occurrence: Option<u32>,
     pub function_name: String,
 }
 

@@ -62,35 +62,34 @@ pub async fn extract_function_impl(
         .get("file_path")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Missing file_path parameter"))?;
-    let start_line = args
-        .get("start_line")
+    let code_block = args
+        .get("code_block")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing code_block parameter"))?;
+    let occurrence = args
+        .get("occurrence")
         .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing start_line parameter"))?;
-    let start_character = args
-        .get("start_character")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing start_character parameter"))?;
-    let end_line = args
-        .get("end_line")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing end_line parameter"))?;
-    let end_character = args
-        .get("end_character")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| anyhow::anyhow!("Missing end_character parameter"))?;
+        .unwrap_or(1) as usize;
     let function_name = args
         .get("function_name")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Missing function_name parameter"))?;
 
+    let file_content = fs::read_to_string(file_path)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+
+    let (start_line, start_char, end_line, end_char) =
+        crate::tools::analysis::find_block_range(&file_content, code_block, occurrence)?;
+
     // Implementation will use rust-analyzer LSP to extract function
     let result = analyzer
         .extract_function(
             file_path,
-            start_line as u32,
-            start_character as u32,
-            end_line as u32,
-            end_character as u32,
+            start_line,
+            start_char,
+            end_line,
+            end_char,
             function_name,
         )
         .await?;

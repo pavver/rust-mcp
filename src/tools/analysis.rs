@@ -160,6 +160,34 @@ pub async fn get_hover_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> R
     })
 }
 
+pub fn find_block_range(
+    file_content: &str,
+    code_block: &str,
+    occurrence: usize,
+) -> Result<(u32, u32, u32, u32)> {
+    let mut current_pos = 0;
+    let mut current_occurrence = 0;
+
+    while let Some(start_idx) = file_content[current_pos..].find(code_block) {
+        let absolute_start_idx = current_pos + start_idx;
+        current_occurrence += 1;
+
+        if current_occurrence == occurrence {
+            let absolute_end_idx = absolute_start_idx + code_block.len();
+            let (start_line, start_char) = index_to_line_col(file_content, absolute_start_idx);
+            let (end_line, end_char) = index_to_line_col(file_content, absolute_end_idx);
+            return Ok((start_line, start_char, end_line, end_char));
+        }
+
+        current_pos = absolute_start_idx + 1;
+    }
+
+    Err(anyhow::anyhow!(
+        "Code block not found (occurrence #{}) in file. Ensure the code block is an exact match.",
+        occurrence
+    ))
+}
+
 pub fn find_symbol_location(
     file_content: &str,
     symbol: &str,

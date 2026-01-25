@@ -200,18 +200,16 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "extract_function",
-            "Extract selected code into a new function",
+            "Extracts a block of code into a new function. Locates the code by matching the provided code_block snippet. More robust than using raw line/character ranges.",
             json!({
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string"},
-                    "start_line": {"type": "number"},
-                    "start_character": {"type": "number"},
-                    "end_line": {"type": "number"},
-                    "end_character": {"type": "number"},
-                    "function_name": {"type": "string"}
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "code_block": {"type": "string", "description": "The exact multi-line code snippet to be extracted into a new function"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the code_block's occurrence. Defaults to 1.", "default": 1},
+                    "function_name": {"type": "string", "description": "The name of the new function"}
                 },
-                "required": ["file_path", "start_line", "start_character", "end_line", "end_character", "function_name"]
+                "required": ["file_path", "code_block", "function_name"]
             }),
         ),
         ToolDefinition::new(

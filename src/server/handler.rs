@@ -461,19 +461,15 @@ impl RustMcpServer {
         &self,
         Parameters(ExtractFunctionParams {
             file_path,
-            start_line,
-            start_character,
-            end_line,
-            end_character,
+            code_block,
+            occurrence,
             function_name,
         }): Parameters<ExtractFunctionParams>,
     ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
-            "start_line": start_line,
-            "start_character": start_character,
-            "end_line": end_line,
-            "end_character": end_character,
+            "code_block": code_block,
+            "occurrence": occurrence,
             "function_name": function_name
         });
 
