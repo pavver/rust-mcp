@@ -169,6 +169,37 @@ pub enum CodeActionOrCommand {
     CodeAction(CodeAction),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeHierarchyItem {
+    pub name: String,
+    pub kind: u32,
+    pub tags: Option<Vec<u32>>,
+    pub detail: Option<String>,
+    pub uri: String,
+    pub range: Range,
+    #[serde(rename = "selectionRange")]
+    pub selection_range: Range,
+    // data field is opaque, we just need to pass it back
+    pub data: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrepareTypeHierarchyParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+    pub position: Position,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeHierarchySupertypesParams {
+    pub item: TypeHierarchyItem,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeHierarchySubtypesParams {
+    pub item: TypeHierarchyItem,
+}
+
 pub type CodeActionResponse = Vec<CodeActionOrCommand>;
 
 pub type SymbolPath = Vec<SymbolPathSegment>;

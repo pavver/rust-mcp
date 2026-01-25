@@ -750,19 +750,116 @@ impl RustAnalyzerClient {
         Ok(format!("Validated lifetimes in {file_path}"))
     }
 
+    pub async fn prepare_type_hierarchy(
+        &mut self,
+        file_path: &str,
+        line: u32,
+        character: u32,
+    ) -> Result<Vec<TypeHierarchyItem>> {
+        self.ensure_initialized()?;
+
+        let params = PrepareTypeHierarchyParams {
+            text_document: TextDocumentIdentifier {
+                uri: format!("file://{}", file_path),
+            },
+            position: Position { line, character },
+        };
+
+        let response = self
+            .send_request_internal("textDocument/prepareTypeHierarchy", serde_json::to_value(params)?)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        if result_value.is_null() {
+            return Ok(Vec::new());
+        }
+        let items: Vec<TypeHierarchyItem> = serde_json::from_value(result_value)?;
+        Ok(items)
+    }
+
+    pub async fn type_hierarchy_supertypes(
+        &mut self,
+        item: TypeHierarchyItem,
+    ) -> Result<Vec<TypeHierarchyItem>> {
+        self.ensure_initialized()?;
+
+        let params = TypeHierarchySupertypesParams { item };
+        let response = self
+            .send_request_internal("typeHierarchy/supertypes", serde_json::to_value(params)?)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        if result_value.is_null() {
+            return Ok(Vec::new());
+        }
+        let items: Vec<TypeHierarchyItem> = serde_json::from_value(result_value)?;
+        Ok(items)
+    }
+
+    pub async fn type_hierarchy_subtypes(
+        &mut self,
+        item: TypeHierarchyItem,
+    ) -> Result<Vec<TypeHierarchyItem>> {
+        self.ensure_initialized()?;
+
+        let params = TypeHierarchySubtypesParams { item };
+        let response = self
+            .send_request_internal("typeHierarchy/subtypes", serde_json::to_value(params)?)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        if result_value.is_null() {
+            return Ok(Vec::new());
+        }
+        let items: Vec<TypeHierarchyItem> = serde_json::from_value(result_value)?;
+        Ok(items)
+    }
+
     pub async fn get_type_hierarchy(
         &mut self,
         file_path: &str,
         line: u32,
         character: u32,
     ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
+        let items = self.prepare_type_hierarchy(file_path, line, character).await?;
+        
+        if items.is_empty() {
+            return Ok("No type hierarchy found for this symbol.".to_string());
         }
-        // This would use rust-analyzer's type hierarchy capability
-        Ok(format!(
-            "Type hierarchy for symbol at {file_path}:{line}:{character}"
-        ))
+
+        let root_item = &items[0];
+        let mut result = format!("Type Hierarchy for `{}`:\n\n", root_item.name);
+
+        // Supertypes (Parents/Traits implemented)
+        let supertypes = self.type_hierarchy_supertypes(root_item.clone()).await?;
+        if !supertypes.is_empty() {
+            result.push_str("Supertypes (Implements):\n");
+            for parent in supertypes {
+                if parent.name != root_item.name { // Skip self if present
+                    let detail = parent.detail.as_deref().unwrap_or("");
+                    result.push_str(&format!("  - {} {}\n", parent.name, detail));
+                }
+            }
+            result.push('\n');
+        }
+
+        // Subtypes (Implementations/Children)
+        let subtypes = self.type_hierarchy_subtypes(root_item.clone()).await?;
+        if !subtypes.is_empty() {
+            result.push_str("Subtypes (Implemented by):\n");
+            for child in subtypes {
+                if child.name != root_item.name { // Skip self if present
+                    let detail = child.detail.as_deref().unwrap_or("");
+                    result.push_str(&format!("  - {} {}\n", child.name, detail));
+                }
+            }
+        }
+
+        if result.trim() == format!("Type Hierarchy for `{}`:", root_item.name) {
+             result.push_str("(No supertypes or subtypes found)");
+        }
+
+        Ok(result)
     }
 
     pub async fn suggest_dependencies(

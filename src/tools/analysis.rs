@@ -160,7 +160,7 @@ pub async fn get_hover_impl(args: Value, analyzer: &mut RustAnalyzerClient) -> R
     })
 }
 
-fn find_symbol_location(
+pub fn find_symbol_location(
     file_content: &str,
     symbol: &str,
     code_block: &str,

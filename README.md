@@ -33,7 +33,7 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 - `run_cargo_check` - Execute cargo check with error parsing
 
 ### Advanced Features (1 tool)
-- `get_type_hierarchy` - Get type relationships for symbols
+- `get_type_hierarchy" - Get type relationships for symbols (context-aware)
 - `suggest_dependencies` - Recommend crates based on code patterns
 - `move_items` - Move code items between files
 

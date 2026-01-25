@@ -254,15 +254,16 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "get_type_hierarchy",
-            "Get type hierarchy for a symbol at specified position",
+            "Retrieves the type hierarchy (supertypes/traits implemented, subtypes/implementations) for a symbol. Useful for understanding trait relationships and implementations.",
             json!({
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string"},
-                    "line": {"type": "integer", "minimum": 0},
-                    "character": {"type": "integer", "minimum": 0}
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "symbol": {"type": "string", "description": "The exact symbol name"},
+                    "code_block": {"type": "string", "description": "A unique multi-line code snippet containing the symbol"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the symbol's occurrence within the code_block", "default": 1}
                 },
-                "required": ["file_path", "line", "character"]
+                "required": ["file_path", "symbol", "code_block"]
             }),
         ),
         ToolDefinition::new(
