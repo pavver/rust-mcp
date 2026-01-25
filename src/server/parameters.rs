@@ -51,8 +51,9 @@ pub struct WorkspaceSymbolsParams {
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct RenameSymbolParams {
     pub file_path: String,
-    pub line: u32,
-    pub character: u32,
+    pub symbol: String,
+    pub code_block: String,
+    pub occurrence: Option<u32>,
     pub new_name: String,
 }
 

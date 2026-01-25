@@ -50,7 +50,10 @@ Use these tools to understand the codebase structure and symbol meanings.
 ### 🛠 Refactoring
 Tools to modify code structure safely.
 
-*   **`rename_symbol`**: Renames symbols with scope awareness (safe refactoring).
+*   **`rename_symbol`**
+    *   **Purpose:** Renames symbols with scope awareness across the entire project.
+    *   **Parameters:** `file_path`, `symbol`, `code_block`, `new_name`, `occurrence` (optional).
+    *   **Behavior:** Locates the symbol within the `code_block` and performs a workspace-wide rename. More robust than using raw coordinates.
 *   **`extract_function`**: Moves selected code into a new function.
 *   **`inline_function`**: Replaces a function call with its body.
 
@@ -74,9 +77,11 @@ You cannot use `read_file` on files outside the project workspace (e.g., Cargo r
         *   *Example:* `run_shell_command("sed -n '400,420p' /abs/path/to/external/lib.rs")`
 
 ### 🎯 Positioning Accuracy
-LSP tools (`get_hover`, `find_definition`) require exact `line` (0-based) and `character` (0-based) coordinates.
-*   If you are unsure of the exact character index, use `read_file` first to inspect the context.
-*   Target the **start** of the symbol name.
+Most tools (`get_hover`, `find_definition`, `rename_symbol`, `get_symbol_source`) are **context-aware** and do NOT require line/character coordinates. They use a `code_block` to locate the symbol reliably.
+
+For tools that still require coordinates (like `extract_function` or `inspect`):
+*   Use `read_file` first to inspect the context and get exact 0-based coordinates.
+*   Target the **start** of the symbol name or selection.
 
 ### 🔄 Troubleshooting
 If tools return "No result" or generic errors:

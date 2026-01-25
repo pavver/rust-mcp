@@ -22,9 +22,9 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 - `workspace_symbols` - Search project symbols
 
 ### Refactoring (3 tools)
-- `rename_symbol` - Rename with scope awareness
-- `extract_function` - Extract code into functions
-- `inline_function` - Inline function calls
+- `rename_symbol` - Rename with scope awareness (context-aware)
+- `extract_function" - Extract code into functions
+- `inline_function" - Inline function calls
 
 ### Quality Assurance (1 tool)
 - `apply_clippy_suggestions` - Apply clippy automatic fixes
@@ -163,7 +163,7 @@ Once configured, you can use the tools through your AI assistant. Here are some 
 
 ### Refactoring
 ```
-"Rename the variable `data` to `user_input` throughout the codebase"
+"Rename the variable `data` to `user_input` in the function `process_data` (provide code block)"
 "Extract this code block into a separate function called `validate_input`"
 "Inline the `helper_function` call on line 42"
 ```
