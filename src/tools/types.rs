@@ -214,15 +214,16 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "inline_function",
-            "Inline a function call at specified position",
+            "Inlines a function call by locating it within a provided code block. More robust than using raw line/character coordinates.",
             json!({
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string"},
-                    "line": {"type": "number"},
-                    "character": {"type": "number"}
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "symbol": {"type": "string", "description": "The name of the function to inline"},
+                    "code_block": {"type": "string", "description": "A unique multi-line code snippet containing the function call"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the function call's occurrence within the code_block", "default": 1}
                 },
-                "required": ["file_path", "line", "character"]
+                "required": ["file_path", "symbol", "code_block"]
             }),
         ),
         ToolDefinition::new(
