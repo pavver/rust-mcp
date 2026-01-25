@@ -34,7 +34,8 @@ Use these tools to understand the codebase structure and symbol meanings.
     *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).
     *   **Note:** This is much more reliable than using raw coordinates. Can return paths to external crates.
 *   **`find_references`**
-    *   **Purpose:** Finds all usages of a symbol across the workspace.
+    *   **Purpose:** Finds all usages of a symbol across the workspace by searching within a provided code block.
+    *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).
 *   **`workspace_symbols`**
     *   **Purpose:** Fuzzy search for symbols by name across the entire project.
     *   **Use Case:** You know the name (e.g., "RustMcpServer") but not the location.

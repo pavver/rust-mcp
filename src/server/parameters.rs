@@ -12,8 +12,9 @@ pub struct FindDefinitionParams {
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct FindReferencesParams {
     pub file_path: String,
-    pub line: u32,
-    pub character: u32,
+    pub symbol: String,
+    pub code_block: String,
+    pub occurrence: Option<u32>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

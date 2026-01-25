@@ -17,7 +17,7 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 - `get_symbol_source` - Get source code of specific symbol (context-aware)
 - `document_symbols` - Get file structure (outline) - **Recommended for large files**
 - `find_definition` - Navigate to symbol definitions (context-aware)
-- `find_references` - Find all symbol uses  
+- `find_references` - Find all symbol uses (context-aware)
 - `get_diagnostics` - Get compiler errors/warnings with fixes
 - `workspace_symbols` - Search project symbols
 

@@ -103,15 +103,16 @@ pub fn get_tools() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "find_references",
-            "Find all references to a symbol at a given position",
+            "Finds all references to a specific symbol by searching within a provided code block. Useful for refactoring and understanding usage patterns.",
             json!({
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string"},
-                    "line": {"type": "number"},
-                    "character": {"type": "number"}
+                    "file_path": {"type": "string", "description": "Absolute path to the file"},
+                    "symbol": {"type": "string", "description": "The exact symbol name to find references for"},
+                    "code_block": {"type": "string", "description": "A unique multi-line code snippet containing the target symbol"},
+                    "occurrence": {"type": "integer", "description": "The 1-based index of the symbol's occurrence within the code_block", "default": 1}
                 },
-                "required": ["file_path", "line", "character"]
+                "required": ["file_path", "symbol", "code_block"]
             }),
         ),
         ToolDefinition::new(
