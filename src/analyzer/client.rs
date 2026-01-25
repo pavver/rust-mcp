@@ -659,6 +659,106 @@ impl RustAnalyzerClient {
         Ok((code_lines.join("\n"), range, target_path))
     }
 
+    pub async fn apply_workspace_edit(&mut self, edit: WorkspaceEdit) -> Result<String> {
+        let mut files_updated = 0;
+
+        if let Some(changes) = edit.changes {
+            for (uri, edits) in changes {
+                let file_path = if uri.starts_with("file://") {
+                    uri.strip_prefix("file://").unwrap().to_string()
+                } else {
+                    uri
+                };
+
+                let content = fs::read_to_string(&file_path).await?;
+                let updated_content = self.apply_text_edits(&content, edits)?;
+                
+                fs::write(&file_path, updated_content).await?;
+                files_updated += 1;
+            }
+        }
+
+        Ok(format!("Successfully applied edits to {} file(s).", files_updated))
+    }
+
+    fn apply_text_edits(&self, content: &str, mut edits: Vec<TextEdit>) -> Result<String> {
+        // Sort edits in reverse order (by line, then character) to avoid shifting issues
+        edits.sort_by(|a, b| {
+            if a.range.start.line != b.range.start.line {
+                b.range.start.line.cmp(&a.range.start.line)
+            } else {
+                b.range.start.character.cmp(&a.range.start.character)
+            }
+        });
+
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        // If the content ends with a newline, lines() will not include it. 
+        // We need to handle this to preserve the final newline.
+        let ends_with_newline = content.ends_with('\n');
+
+        for edit in edits {
+            let start_line = edit.range.start.line as usize;
+            let start_char = edit.range.start.character as usize;
+            let end_line = edit.range.end.line as usize;
+            let end_char = edit.range.end.character as usize;
+
+            if start_line >= lines.len() || end_line >= lines.len() {
+                // If it's a new line at the end, handle it
+                if start_line == lines.len() && end_line == lines.len() {
+                    lines.push(edit.new_text);
+                    continue;
+                }
+                return Err(anyhow::anyhow!("Edit range out of bounds"));
+            }
+
+            // This is a simplified text edit application.
+            // For true correctness, we should handle multi-line edits correctly.
+            if start_line == end_line {
+                let line = &mut lines[start_line];
+                let prefix: String = line.chars().take(start_char).collect();
+                let suffix: String = line.chars().skip(end_char).collect();
+                
+                // If new_text contains newlines, we need to split it
+                if edit.new_text.contains('\n') {
+                    let mut parts: Vec<String> = edit.new_text.split('\n').map(|s| s.to_string()).collect();
+                    parts[0] = format!("{}{}", prefix, parts[0]);
+                    let last_idx = parts.len() - 1;
+                    parts[last_idx] = format!("{}{}", parts[last_idx], suffix);
+                    
+                    lines.remove(start_line);
+                    for (i, part) in parts.into_iter().enumerate() {
+                        lines.insert(start_line + i, part);
+                    }
+                } else {
+                    *line = format!("{}{}{}", prefix, edit.new_text, suffix);
+                }
+            } else {
+                // Multi-line edit
+                let first_line_prefix: String = lines[start_line].chars().take(start_char).collect();
+                let last_line_suffix: String = lines[end_line].chars().skip(end_char).collect();
+                
+                let mut new_lines: Vec<String> = edit.new_text.split('\n').map(|s| s.to_string()).collect();
+                new_lines[0] = format!("{}{}", first_line_prefix, new_lines[0]);
+                let last_new_idx = new_lines.len() - 1;
+                new_lines[last_new_idx] = format!("{}{}", new_lines[last_new_idx], last_line_suffix);
+                
+                // Remove the old range and insert new lines
+                for _ in start_line..=end_line {
+                    lines.remove(start_line);
+                }
+                for (i, new_line) in new_lines.into_iter().enumerate() {
+                    lines.insert(start_line + i, new_line);
+                }
+            }
+        }
+
+        let mut result = lines.join("\n");
+        if ends_with_newline && !result.ends_with('\n') {
+            result.push('\n');
+        }
+        Ok(result)
+    }
+
     pub async fn rename_symbol(
         &mut self,
         file_path: &str,
@@ -666,16 +766,20 @@ impl RustAnalyzerClient {
         character: u32,
         new_name: &str,
     ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
+        self.ensure_initialized()?;
 
         let params = create_rename_params(file_path, line, character, new_name);
         let response = self
             .send_request_internal("textDocument/rename", params)
             .await?;
 
-        Ok(format!("Rename response: {response}"))
+        let result_value = Self::extract_result(&response)?;
+        if result_value.is_null() {
+            return Ok("No changes required".to_string());
+        }
+
+        let edit: WorkspaceEdit = serde_json::from_value(result_value)?;
+        self.apply_workspace_edit(edit).await
     }
 
     pub async fn format_code(&mut self, file_path: &str) -> Result<String> {
@@ -743,15 +847,42 @@ impl RustAnalyzerClient {
         end_character: u32,
         function_name: &str,
     ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
+        self.ensure_initialized()?;
 
-        // This would use rust-analyzer's extract function code action
-        // For now, return a placeholder implementation
-        Ok(format!(
-            "Extract function '{function_name}' from {file_path}:{start_line}:{start_character} to {end_line}:{end_character}"
-        ))
+        let params = create_code_action_params(file_path, start_line, start_character, end_line, end_character);
+        let response = self
+            .send_request_internal("textDocument/codeAction", params)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        let actions: CodeActionResponse = serde_json::from_value(result_value)?;
+
+        // Find the "Extract into function" action
+        let action = actions.into_iter().find(|a| match a {
+            CodeActionOrCommand::CodeAction(ca) => {
+                ca.title.to_lowercase().contains("extract") && ca.title.to_lowercase().contains("function")
+            }
+            _ => false,
+        }).ok_or_else(|| anyhow::anyhow!("No 'Extract into function' action found for this range. Ensure you selected a valid block of code."))?;
+
+        match action {
+            CodeActionOrCommand::CodeAction(ca) => {
+                if let Some(edit) = ca.edit {
+                    let apply_res = self.apply_workspace_edit(edit).await?;
+                    
+                    // After extraction, the new function is usually called 'new_fn' or similar.
+                    // We should attempt to rename it to function_name.
+                    // This is a bit tricky as we need to find WHERE the new function was inserted.
+                    // For now, we'll return the success of extraction.
+                    Ok(format!("{}. Note: You might need to rename the extracted function manually if it wasn't named '{}' automatically.", apply_res, function_name))
+                } else if let Some(command) = ca.command {
+                     Ok(format!("Extraction requires a command execution (not yet fully automated): {}", command.title))
+                } else {
+                     Err(anyhow::anyhow!("Code action has no edit or command"))
+                }
+            }
+            _ => Err(anyhow::anyhow!("Unexpected command instead of code action")),
+        }
     }
 
     pub async fn inline_function(
@@ -760,12 +891,35 @@ impl RustAnalyzerClient {
         line: u32,
         character: u32,
     ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
+        self.ensure_initialized()?;
+
+        // Use a small range around the position for the code action
+        let params = create_code_action_params(file_path, line, character, line, character + 1);
+        let response = self
+            .send_request_internal("textDocument/codeAction", params)
+            .await?;
+
+        let result_value = Self::extract_result(&response)?;
+        let actions: CodeActionResponse = serde_json::from_value(result_value)?;
+
+        // Find the "Inline" action
+        let action = actions.into_iter().find(|a| match a {
+            CodeActionOrCommand::CodeAction(ca) => {
+                ca.title.to_lowercase().contains("inline")
+            }
+            _ => false,
+        }).ok_or_else(|| anyhow::anyhow!("No 'Inline' action found at this position. Ensure the cursor is on a function call or definition that can be inlined."))?;
+
+        match action {
+            CodeActionOrCommand::CodeAction(ca) => {
+                if let Some(edit) = ca.edit {
+                    self.apply_workspace_edit(edit).await
+                } else {
+                     Err(anyhow::anyhow!("Inline code action has no edit"))
+                }
+            }
+            _ => Err(anyhow::anyhow!("Unexpected command instead of code action")),
         }
-        Ok(format!(
-            "Inlined function at {file_path}:{line}:{character}"
-        ))
     }
 
     pub async fn apply_clippy_suggestions(&mut self, file_path: &str) -> Result<String> {
