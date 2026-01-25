@@ -1,9 +1,9 @@
 use anyhow::Result;
 use rmcp::{
-    ServerHandler,
-    handler::server::{router::tool::ToolRouter, tool::Parameters},
-    model::{ErrorData as McpError, *},
     tool, tool_handler, tool_router,
+    model::{CallToolResult, Content, ErrorCode, ServerInfo, ProtocolVersion, ServerCapabilities, Implementation, ErrorData as McpError},
+    handler::server::{tool::ToolRouter, wrapper::Parameters},
+    ServerHandler,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -76,7 +76,7 @@ impl RustMcpServer {
     async fn capabilities(
         &self,
         Parameters(CapabilitiesParams { gating_mode }): Parameters<CapabilitiesParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let context = self.inspection_context(gating_mode.as_deref());
 
         let views = InspectionView::curated()
@@ -108,7 +108,7 @@ impl RustMcpServer {
             provenance: context.provenance(),
         };
 
-        Ok(CallToolResult::success(vec![json_content(capabilities)?]))
+        Ok(CallToolResult::success(vec![json_content(capabilities).map_err(to_mcp_error)?]))
     }
 
     #[tool(description = "Inspect compiler artifacts using curated presets")]
@@ -124,7 +124,7 @@ impl RustMcpServer {
             target,
             gating_mode,
         }): Parameters<InspectParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let context = self.inspection_context(gating_mode.as_deref());
         let result = self
             .perform_inspection(
@@ -137,9 +137,10 @@ impl RustMcpServer {
                 opt_level,
                 target,
             )
-            .await?;
+            .await
+            .map_err(to_mcp_error)?;
 
-        Ok(CallToolResult::success(vec![json_content(result)?]))
+        Ok(CallToolResult::success(vec![json_content(result).map_err(to_mcp_error)?]))
     }
 
     fn inspection_context(&self, gating_override: Option<&str>) -> InspectionContext {
@@ -159,7 +160,7 @@ impl RustMcpServer {
             code_block,
             occurrence,
         }): Parameters<FindDefinitionParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "symbol": symbol,
@@ -196,7 +197,7 @@ impl RustMcpServer {
             code_block,
             occurrence,
         }): Parameters<FindReferencesParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "symbol": symbol,
@@ -228,7 +229,7 @@ impl RustMcpServer {
     async fn get_diagnostics(
         &self,
         Parameters(GetDiagnosticsParams { file_path }): Parameters<GetDiagnosticsParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path
         });
@@ -257,7 +258,7 @@ impl RustMcpServer {
     async fn workspace_symbols(
         &self,
         Parameters(WorkspaceSymbolsParams { query }): Parameters<WorkspaceSymbolsParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "query": query
         });
@@ -293,7 +294,7 @@ impl RustMcpServer {
             code_block,
             occurrence,
         }): Parameters<GetHoverParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "symbol": symbol,
@@ -325,7 +326,7 @@ impl RustMcpServer {
     async fn document_symbols(
         &self,
         Parameters(GetDocumentSymbolsParams { file_path }): Parameters<GetDocumentSymbolsParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path
         });
@@ -359,7 +360,7 @@ impl RustMcpServer {
             code_block,
             occurrence,
         }): Parameters<GetSymbolSourceParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "symbol": symbol,
@@ -396,7 +397,7 @@ impl RustMcpServer {
             character,
             new_name,
         }): Parameters<RenameSymbolParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "line": line,
@@ -428,7 +429,7 @@ impl RustMcpServer {
     async fn run_cargo_check(
         &self,
         Parameters(RunCargoCheckParams { workspace_path }): Parameters<RunCargoCheckParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "workspace_path": workspace_path
         });
@@ -464,7 +465,7 @@ impl RustMcpServer {
             end_character,
             function_name,
         }): Parameters<ExtractFunctionParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "start_line": start_line,
@@ -502,7 +503,7 @@ impl RustMcpServer {
             line,
             character,
         }): Parameters<InlineFunctionParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "line": line,
@@ -535,7 +536,7 @@ impl RustMcpServer {
         Parameters(ApplyClippySuggestionsParams { file_path }): Parameters<
             ApplyClippySuggestionsParams,
         >,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path
         });
@@ -569,7 +570,7 @@ impl RustMcpServer {
             code_block,
             occurrence,
         }): Parameters<GetTypeHierarchyParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
             "symbol": symbol,
@@ -608,7 +609,7 @@ impl RustMcpServer {
             opt_level,
             target,
         }): Parameters<InspectMirParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let context = self.inspection_context(None);
         let result = self
             .perform_inspection(
@@ -621,9 +622,10 @@ impl RustMcpServer {
                 opt_level,
                 target,
             )
-            .await?;
+            .await
+            .map_err(to_mcp_error)?;
 
-        Ok(CallToolResult::success(vec![json_content(result)?]))
+        Ok(CallToolResult::success(vec![json_content(result).map_err(to_mcp_error)?]))
     }
 
     #[tool(description = "Inspect LLVM IR for a symbol or position")]
@@ -637,7 +639,7 @@ impl RustMcpServer {
             opt_level,
             target,
         }): Parameters<InspectLlvmIrParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let context = self.inspection_context(None);
         let result = self
             .perform_inspection(
@@ -650,9 +652,10 @@ impl RustMcpServer {
                 opt_level,
                 target,
             )
-            .await?;
+            .await
+            .map_err(to_mcp_error)?;
 
-        Ok(CallToolResult::success(vec![json_content(result)?]))
+        Ok(CallToolResult::success(vec![json_content(result).map_err(to_mcp_error)?]))
     }
 
     #[tool(description = "Inspect assembly for a symbol or position")]
@@ -666,7 +669,7 @@ impl RustMcpServer {
             opt_level,
             target,
         }): Parameters<InspectAsmParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> std::result::Result<CallToolResult, McpError> {
         let context = self.inspection_context(None);
         let result = self
             .perform_inspection(
@@ -679,9 +682,10 @@ impl RustMcpServer {
                 opt_level,
                 target,
             )
-            .await?;
+            .await
+            .map_err(to_mcp_error)?;
 
-        Ok(CallToolResult::success(vec![json_content(result)?]))
+        Ok(CallToolResult::success(vec![json_content(result).map_err(to_mcp_error)?]))
     }
 
     async fn perform_inspection(
@@ -694,7 +698,7 @@ impl RustMcpServer {
         symbol_name: Option<String>,
         opt_level: Option<String>,
         target: Option<String>,
-    ) -> Result<InspectionResult, McpError> {
+    ) -> Result<InspectionResult> {
         let Some(view) = InspectionView::find(view_name) else {
             return Err(mcp_error(
                 ErrorCode::INVALID_PARAMS,
@@ -784,10 +788,10 @@ impl RustMcpServer {
                                 format!("Unable to locate MIR for symbol: {e}"),
                                 None,
                             )
-                        })?
+                        })? 
                     }
                     "llvm-ir" => {
-                        let llvm_outputs =
+                        let llvm_outputs: Vec<String> = 
                             read_artifacts(&run_result.artifacts, &["ll"], context.limits())
                                 .await?;
                         if llvm_outputs.is_empty() {
@@ -807,7 +811,7 @@ impl RustMcpServer {
                         })?
                     }
                     "asm" => {
-                        let assemblies = load_assembly_artifacts(
+                        let assemblies: Vec<TargetedAssembly> = load_assembly_artifacts(
                             &run_result.artifacts,
                             target.as_ref(),
                             context.limits(),
@@ -871,7 +875,7 @@ impl RustMcpServer {
         line: Option<u32>,
         character: Option<u32>,
         symbol_name: Option<String>,
-    ) -> Result<ResolvedDefinition, McpError> {
+    ) -> Result<ResolvedDefinition> {
         let (line, character) = match (line, character) {
             (Some(line), Some(character)) => (line, character),
             _ => {
@@ -893,7 +897,7 @@ impl RustMcpServer {
                     format!("Failed to resolve symbol: {e}"),
                     None,
                 )
-            })?
+            })? 
             .ok_or_else(|| symbol_not_found_error(file_path, line, character))?;
 
         let mut identity = identity_from_definition(&details.location.uri, &details.symbol_path)
@@ -931,7 +935,7 @@ impl RustMcpServer {
         character: Option<u32>,
         symbol_name: Option<String>,
         target: Option<String>,
-    ) -> Result<NormalizedSymbol, McpError> {
+    ) -> Result<NormalizedSymbol> {
         let (line, character) = match (line, character) {
             (Some(line), Some(character)) => (line, character),
             _ => {
@@ -954,11 +958,11 @@ impl RustMcpServer {
                         format!("Failed to resolve symbol: {e}"),
                         None,
                     )
-                })?
+                })? 
                 .ok_or_else(|| symbol_not_found_error(file_path, line, character))?;
 
             identity_from_definition(&details.location.uri, &details.symbol_path)
-                .ok_or_else(|| symbol_not_found_error(file_path, line, character))?
+                .ok_or_else(|| symbol_not_found_error(file_path, line, character))? 
         };
 
         if !matches!(identity.kind, SymbolKind::FreeFunction | SymbolKind::Method) {
@@ -985,7 +989,7 @@ impl RustMcpServer {
         target: Option<String>,
         emit: Option<&str>,
         unpretty: Option<&str>,
-    ) -> Result<RunResult, McpError> {
+    ) -> Result<RunResult> {
         let runner = CompilerRunner::with_target_dir(context.target_dir());
         let request = RunRequest {
             manifest_path: None,
@@ -1036,25 +1040,23 @@ fn truncation_note(summary: &TruncationSummary) -> String {
     )
 }
 
-fn json_content<T: Serialize>(value: T) -> Result<Content, McpError> {
-    Content::json(value).map_err(|e| {
-        mcp_error(
-            ErrorCode::INTERNAL_ERROR,
-            format!("Failed to serialize response: {e}"),
-            None,
-        )
-    })
+fn json_content<T: Serialize>(value: T) -> Result<Content> {
+    Ok(Content::json(value)?)
 }
 
-fn mcp_error(code: ErrorCode, message: impl Into<String>, data: Option<Value>) -> McpError {
-    McpError::new(code, message.into(), data)
+fn mcp_error(code: ErrorCode, message: impl Into<String>, data: Option<Value>) -> anyhow::Error {
+    anyhow::anyhow!("Error {:?}: {} ({:?})", code, message.into(), data)
+}
+
+fn to_mcp_error(e: anyhow::Error) -> McpError {
+    McpError::internal_error(e.to_string(), None)
 }
 
 fn enforce_artifact_limit(
     path: &Path,
     size: usize,
     limits: &InspectionLimits,
-) -> Result<(), McpError> {
+) -> Result<()> {
     if size > limits.max_output_bytes {
         return Err(mcp_error(
             ErrorCode::INTERNAL_ERROR,
@@ -1075,7 +1077,7 @@ fn enforce_artifact_limit(
     Ok(())
 }
 
-fn symbol_not_found_error(file_path: &str, line: u32, character: u32) -> McpError {
+fn symbol_not_found_error(file_path: &str, line: u32, character: u32) -> anyhow::Error {
     mcp_error(
         ErrorCode::RESOURCE_NOT_FOUND,
         format!("No symbol found at {}:{}:{}", file_path, line, character),
@@ -1087,7 +1089,7 @@ fn symbol_not_found_error(file_path: &str, line: u32, character: u32) -> McpErro
     )
 }
 
-fn non_function_error(identity: &SymbolIdentity) -> McpError {
+fn non_function_error(identity: &SymbolIdentity) -> anyhow::Error {
     mcp_error(
         ErrorCode::INVALID_PARAMS,
         format!(
@@ -1100,7 +1102,7 @@ fn non_function_error(identity: &SymbolIdentity) -> McpError {
     )
 }
 
-fn compiler_failure_error(result: &RunResult) -> McpError {
+fn compiler_failure_error(result: &RunResult) -> anyhow::Error {
     mcp_error(
         ErrorCode::INTERNAL_ERROR,
         "Compiler run failed",
@@ -1117,7 +1119,7 @@ async fn read_artifacts(
     paths: &[PathBuf],
     extensions: &[&str],
     limits: &InspectionLimits,
-) -> Result<Vec<String>, McpError> {
+) -> Result<Vec<String>> {
     let mut outputs = Vec::new();
 
     for path in paths {
@@ -1152,7 +1154,7 @@ async fn load_assembly_artifacts(
     paths: &[PathBuf],
     target_hint: Option<&String>,
     limits: &InspectionLimits,
-) -> Result<Vec<TargetedAssembly>, McpError> {
+) -> Result<Vec<TargetedAssembly>> {
     let mut assemblies = Vec::new();
 
     for path in paths {
