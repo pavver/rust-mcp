@@ -697,8 +697,41 @@ impl RustAnalyzerClient {
     }
 
     pub async fn run_cargo_check(&mut self, workspace_path: &str) -> Result<String> {
-        // This would run cargo check and parse results
-        Ok(format!("Cargo check results for: {workspace_path}"))
+        let output = tokio::process::Command::new("cargo")
+            .arg("check")
+            .arg("--message-format=json")
+            .current_dir(workspace_path)
+            .output()
+            .await?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut result = String::new();
+        
+        for line in stdout.lines() {
+            if let Ok(msg) = serde_json::from_str::<Value>(line) {
+                if msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-message") {
+                    if let Some(message) = msg.get("message") {
+                        let level = message.get("level").and_then(|l| l.as_str()).unwrap_or("unknown");
+                        let rendered = message.get("rendered").and_then(|r| r.as_str()).unwrap_or("");
+                        
+                        if level == "error" || level == "warning" {
+                            result.push_str(rendered);
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.is_empty() {
+            if output.status.success() {
+                Ok("Cargo check passed with no errors or warnings.".to_string())
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Ok(format!("Cargo check failed:\n{}", stderr))
+            }
+        } else {
+            Ok(result)
+        }
     }
 
     pub async fn extract_function(
