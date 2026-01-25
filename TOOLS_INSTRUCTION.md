@@ -30,9 +30,9 @@ Use these tools to understand the codebase structure and symbol meanings.
     *   **Parameters:** `file_path`.
     *   **Use Case:** **CRITICAL for Large Files:** ALWAYS use this *before* reading a large file. It returns a lightweight outline. Use the returned ranges to read *only* the specific code you need with `read_file` (using limits/offsets), saving massive amounts of context tokens.
 *   **`find_definition`**
-    *   **Purpose:** Locates where a symbol is defined.
-    *   **Parameters:** `file_path`, `line`, `character`.
-    *   **Note:** Can return paths to external crates (in Cargo registry).
+    *   **Purpose:** Locates where a symbol is defined by searching within a provided code block.
+    *   **Parameters:** `file_path`, `symbol`, `code_block`, `occurrence` (optional).
+    *   **Note:** This is much more reliable than using raw coordinates. Can return paths to external crates.
 *   **`find_references`**
     *   **Purpose:** Finds all usages of a symbol across the workspace.
 *   **`workspace_symbols`**

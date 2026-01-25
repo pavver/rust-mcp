@@ -155,14 +155,16 @@ impl RustMcpServer {
         &self,
         Parameters(FindDefinitionParams {
             file_path,
-            line,
-            character,
+            symbol,
+            code_block,
+            occurrence,
         }): Parameters<FindDefinitionParams>,
     ) -> Result<CallToolResult, McpError> {
         let args = serde_json::json!({
             "file_path": file_path,
-            "line": line,
-            "character": character
+            "symbol": symbol,
+            "code_block": code_block,
+            "occurrence": occurrence
         });
 
         let mut analyzer = self.analyzer.lock().await;
