@@ -71,10 +71,6 @@ pub async fn execute_tool(
         "get_type_hierarchy" => {
             crate::tools::advanced::get_type_hierarchy_impl(args, analyzer).await
         }
-        "suggest_dependencies" => {
-            crate::tools::advanced::suggest_dependencies_impl(args, analyzer).await
-        }
-        "move_items" => crate::tools::advanced::move_items_impl(args, analyzer).await,
         "inspect_mir" => Ok(not_implemented_tool_result("inspect_mir")),
         "inspect_llvm_ir" => Ok(not_implemented_tool_result("inspect_llvm_ir")),
         "inspect_asm" => Ok(not_implemented_tool_result("inspect_asm")),
@@ -264,34 +260,6 @@ pub fn get_tools() -> Vec<ToolDefinition> {
                     "occurrence": {"type": "integer", "description": "The 1-based index of the symbol's occurrence within the code_block", "default": 1}
                 },
                 "required": ["file_path", "symbol", "code_block"]
-            }),
-        ),
-        ToolDefinition::new(
-            "suggest_dependencies",
-            "Suggest crate dependencies based on code patterns",
-            json!({
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "workspace_path": {"type": "string"}
-                },
-                "required": ["query", "workspace_path"]
-            }),
-        ),
-        ToolDefinition::new(
-            "move_items",
-            "Move code items from one file to another",
-            json!({
-                "type": "object",
-                "properties": {
-                    "source_file": {"type": "string"},
-                    "target_file": {"type": "string"},
-                    "item_names": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["source_file", "target_file", "item_names"]
             }),
         ),
         ToolDefinition::new(

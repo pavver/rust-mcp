@@ -34,8 +34,6 @@ A comprehensive Model Context Protocol (MCP) server that provides rust-analyzer 
 
 ### Advanced Features (1 tool)
 - `get_type_hierarchy" - Get type relationships for symbols (context-aware)
-- `suggest_dependencies` - Recommend crates based on code patterns
-- `move_items` - Move code items between files
 
 ## Prerequisites
 
@@ -183,8 +181,6 @@ Once configured, you can use the tools through your AI assistant. Here are some 
 ### Advanced Features
 ```
 "Show me the type hierarchy for the symbol at line 15, character 8 in src/main.rs"
-"Suggest crate dependencies for HTTP client functionality in this workspace"
-"Move the User struct and validate_user function from src/main.rs to src/user.rs"
 ```
 
 ## Architecture

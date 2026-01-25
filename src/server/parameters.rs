@@ -92,19 +92,6 @@ pub struct GetTypeHierarchyParams {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct SuggestDependenciesParams {
-    pub query: String,
-    pub workspace_path: String,
-}
-
-#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct MoveItemsParams {
-    pub source_file: String,
-    pub target_file: String,
-    pub item_names: Vec<String>,
-}
-
-#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct InspectMirParams {
     pub file_path: String,
     pub line: Option<u32>,

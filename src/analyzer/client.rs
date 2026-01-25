@@ -649,59 +649,6 @@ impl RustAnalyzerClient {
         ))
     }
 
-    pub async fn generate_struct(
-        &mut self,
-        struct_name: &str,
-        fields: &[Value],
-        derives: &[&str],
-        file_path: &str,
-    ) -> Result<String> {
-        // This would generate a struct with the specified fields and derives
-        Ok(format!(
-            "Generated struct '{struct_name}' with {} fields and derives {derives:?} in {file_path}",
-            fields.len()
-        ))
-    }
-
-    pub async fn generate_enum(
-        &mut self,
-        enum_name: &str,
-        variants: &[Value],
-        derives: &[&str],
-        file_path: &str,
-    ) -> Result<String> {
-        // This would generate an enum with the specified variants and derives
-        Ok(format!(
-            "Generated enum '{enum_name}' with {} variants and derives {derives:?} in {file_path}",
-            variants.len()
-        ))
-    }
-
-    pub async fn generate_trait_impl(
-        &mut self,
-        trait_name: &str,
-        struct_name: &str,
-        file_path: &str,
-    ) -> Result<String> {
-        // This would generate a trait implementation for the specified struct
-        Ok(format!(
-            "Generated trait implementation of '{trait_name}' for '{struct_name}' in {file_path}"
-        ))
-    }
-
-    pub async fn generate_tests(
-        &mut self,
-        target_function: &str,
-        file_path: &str,
-        test_cases: &[Value],
-    ) -> Result<String> {
-        // This would generate unit tests for the specified function
-        Ok(format!(
-            "Generated {} test cases for function '{target_function}' in {file_path}",
-            test_cases.len()
-        ))
-    }
-
     pub async fn inline_function(
         &mut self,
         file_path: &str,
@@ -716,38 +663,9 @@ impl RustAnalyzerClient {
         ))
     }
 
-    pub async fn change_signature(
-        &mut self,
-        file_path: &str,
-        line: u32,
-        character: u32,
-        new_signature: &str,
-    ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        Ok(format!(
-            "Changed signature to '{new_signature}' at {file_path}:{line}:{character}"
-        ))
-    }
-
-    pub async fn organize_imports(&mut self, file_path: &str) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        Ok(format!("Organized imports in {file_path}"))
-    }
-
     pub async fn apply_clippy_suggestions(&mut self, file_path: &str) -> Result<String> {
         // This would apply clippy suggestions to the file
         Ok(format!("Applied clippy suggestions to {file_path}"))
-    }
-
-    pub async fn validate_lifetimes(&mut self, file_path: &str) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        Ok(format!("Validated lifetimes in {file_path}"))
     }
 
     pub async fn prepare_type_hierarchy(
@@ -860,49 +778,5 @@ impl RustAnalyzerClient {
         }
 
         Ok(result)
-    }
-
-    pub async fn suggest_dependencies(
-        &mut self,
-        query: &str,
-        workspace_path: &str,
-    ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        // This would analyze code and suggest crates based on usage patterns
-        Ok(format!(
-            "Dependency suggestions for '{query}' in workspace {workspace_path}"
-        ))
-    }
-
-    pub async fn create_module(
-        &mut self,
-        module_name: &str,
-        module_path: &str,
-        is_public: bool,
-    ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        let visibility = if is_public { "pub " } else { "" };
-        Ok(format!(
-            "Created {visibility}module '{module_name}' at {module_path}"
-        ))
-    }
-
-    pub async fn move_items(
-        &mut self,
-        source_file: &str,
-        target_file: &str,
-        item_names: &[&str],
-    ) -> Result<String> {
-        if !self.initialized {
-            return Err(anyhow::anyhow!("Client not initialized"));
-        }
-        Ok(format!(
-            "Moved {} items from {source_file} to {target_file}: {item_names:?}",
-            item_names.len()
-        ))
     }
 }
